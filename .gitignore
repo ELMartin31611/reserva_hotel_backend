@@ -1,0 +1,87 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+
+# =========================
+# Entornos virtuales
+# =========================
+.venv/
+venv/
+env/
+ENV/
+
+# =========================
+# Variables de entorno
+# =========================
+.env
+.env.local
+.env.*.local
+
+# Sí se permite subir la plantilla
+!.env.example
+
+# =========================
+# Django
+# =========================
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# =========================
+# Migraciones temporales
+# OJO: normalmente las migraciones SÍ se suben.
+# No ignores migrations/*.py en proyecto final.
+# =========================
+*/migrations/__pycache__/
+
+# =========================
+# Archivos de sistema
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Editores / IDE
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Pytest / coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# MyPy / Ruff / cache
+# =========================
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Archivos comprimidos / backups
+# =========================
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bak
+*.tmp
