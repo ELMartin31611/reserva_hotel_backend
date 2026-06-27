@@ -11,3 +11,5 @@ from .documento_cliente import DocumentoClienteViewSet
 from .cargo_empleado import (
     CargoEmpleadoViewSet
 )
+
+from .turno import TurnoViewSet

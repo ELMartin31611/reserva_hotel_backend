@@ -10,3 +10,4 @@ from .documento_cliente import DocumentoClienteSerializer
 from .cargo_empleado import (
     CargoEmpleadoSerializer
 )
+from .turno import TurnoSerializer
