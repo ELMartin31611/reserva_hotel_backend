@@ -1,2 +1,3 @@
 from .tipo_habitacion_servicio import TipoHabitacionServicioSerializer
 from .temporada import TemporadaSerializer
+from .tarifa_habitacion import TarifaHabitacionSerializer
