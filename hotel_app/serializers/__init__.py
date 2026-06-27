@@ -3,8 +3,6 @@ from .perfil_usuario import (
     PerfilUsuarioSerializer
 )
 
-from .cliente import (
-    ClienteSerializer,
-    DireccionClienteSerializer,
-    DocumentoClienteSerializer
-)
+from .cliente import ClienteSerializer
+from .direccion_cliente import DireccionClienteSerializer
+from .documento_cliente import DocumentoClienteSerializer

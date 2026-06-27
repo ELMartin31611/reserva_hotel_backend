@@ -3,8 +3,6 @@ from .perfil_usuario import (
     PerfilView
 )
 
-from .cliente import (
-    ClienteViewSet,
-    DireccionClienteViewSet,
-    DocumentoClienteViewSet
-)
+from .cliente import ClienteViewSet
+from .direccion_cliente import DireccionClienteViewSet
+from .documento_cliente import DocumentoClienteViewSet
