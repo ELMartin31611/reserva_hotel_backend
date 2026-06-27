@@ -6,3 +6,8 @@ from .perfil_usuario import (
 from .cliente import ClienteViewSet
 from .direccion_cliente import DireccionClienteViewSet
 from .documento_cliente import DocumentoClienteViewSet
+
+
+from .cargo_empleado import (
+    CargoEmpleadoViewSet
+)

@@ -6,3 +6,7 @@ from .perfil_usuario import (
 from .cliente import ClienteSerializer
 from .direccion_cliente import DireccionClienteSerializer
 from .documento_cliente import DocumentoClienteSerializer
+
+from .cargo_empleado import (
+    CargoEmpleadoSerializer
+)
