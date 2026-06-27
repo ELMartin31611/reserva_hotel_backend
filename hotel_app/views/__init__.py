@@ -14,3 +14,4 @@ from .cargo_empleado import (
 
 from .turno import TurnoViewSet
 from .empleado import EmpleadoViewSet
+from .empleado_turno import EmpleadoTurnoViewSet
