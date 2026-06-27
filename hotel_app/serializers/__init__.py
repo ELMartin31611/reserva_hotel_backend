@@ -11,3 +11,4 @@ from .cargo_empleado import (
     CargoEmpleadoSerializer
 )
 from .turno import TurnoSerializer
+from .empleado import EmpleadoSerializer

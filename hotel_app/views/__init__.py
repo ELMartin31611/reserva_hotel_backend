@@ -13,3 +13,4 @@ from .cargo_empleado import (
 )
 
 from .turno import TurnoViewSet
+from .empleado import EmpleadoViewSet
