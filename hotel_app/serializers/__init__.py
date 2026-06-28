@@ -1,1 +1,2 @@
 from .reserva import ReservaSerializer
+from .reserva_habitacion import ReservaHabitacionSerializer
