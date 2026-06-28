@@ -41,7 +41,7 @@ staticfiles/
 # No ignores migrations/*.py en proyecto final.
 # =========================
 */migrations/__pycache__/
-
+*.py[cod]
 # =========================
 # Archivos de sistema
 # =========================
