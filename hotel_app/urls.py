@@ -1,6 +1,8 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from hotel_app.views.health import health_check
+from hotel_app.views.pago import PagoViewSet
+from hotel_app.views.factura import FacturaViewSet
 from hotel_app.views.reserva import ReservaViewSet
 from hotel_app.views.reserva_habitacion import ReservaHabitacionViewSet
 from hotel_app.views.huesped_reserva import HuespedReservaViewSet
@@ -58,6 +60,9 @@ from hotel_app.views import (
 )
 
 router = DefaultRouter()
+router.register(r'pagos', PagoViewSet, basename='pagos')
+
+router.register(r'facturas', FacturaViewSet, basename='facturas')
 
 
 router.register(

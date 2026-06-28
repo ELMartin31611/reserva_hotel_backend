@@ -1,4 +1,6 @@
 
+from .pago import PagoViewSet
+from .factura import FacturaViewSet
 from .reserva import ReservaViewSet
 from .reserva_habitacion import ReservaHabitacionViewSet
 from .huesped_reserva import HuespedReservaViewSet
@@ -23,4 +25,5 @@ from .cargo_empleado import (
 from .turno import TurnoViewSet
 from .empleado import EmpleadoViewSet
 from .empleado_turno import EmpleadoTurnoViewSet
+
 

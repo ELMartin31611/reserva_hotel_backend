@@ -1,4 +1,8 @@
 
+from .pago import Pago
+from .factura import Factura
+
+
 from .reserva import Reserva
 from .reserva_habitacion import ReservaHabitacion
 from .huesped_reserva import HuespedReserva
@@ -13,4 +17,5 @@ from .cargo_empleado import CargoEmpleado
 from .turno import Turno
 from .empleado import Empleado
 from .empleado_turno import EmpleadoTurno
+
 
