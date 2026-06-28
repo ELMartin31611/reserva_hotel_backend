@@ -1,4 +1,14 @@
 
+from .hotel import Hotel
+from .direccion_hotel import DireccionHotel
+from .tipo_habitacion import TipoHabitacion
+from .habitacion import Habitacion
+from .cama import Cama
+from .tipo_habitacion_cama import TipoHabitacionCama
+from .imagen_habitacion import ImagenHabitacion
+from .servicio import Servicio
+
+
 from .pago import Pago
 from .factura import Factura
 
@@ -17,5 +27,6 @@ from .cargo_empleado import CargoEmpleado
 from .turno import Turno
 from .empleado import Empleado
 from .empleado_turno import EmpleadoTurno
+
 
 

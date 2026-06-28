@@ -1,4 +1,14 @@
 
+from .hotel import HotelViewSet
+from .direccion_hotel import DireccionHotelViewSet
+from .tipo_habitacion import TipoHabitacionViewSet
+from .habitacion import HabitacionViewSet
+from .cama import CamaViewSet
+from .tipo_habitacion_cama import TipoHabitacionCamaViewSet
+from .imagen_habitacion import ImagenHabitacionViewSet
+from .servicio import ServicioViewSet
+
+
 from .pago import PagoViewSet
 from .factura import FacturaViewSet
 from .reserva import ReservaViewSet
@@ -25,5 +35,6 @@ from .cargo_empleado import (
 from .turno import TurnoViewSet
 from .empleado import EmpleadoViewSet
 from .empleado_turno import EmpleadoTurnoViewSet
+
 
 
