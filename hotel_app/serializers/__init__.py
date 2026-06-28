@@ -36,5 +36,5 @@ from .cargo_empleado import (
 from .turno import TurnoSerializer
 from .empleado import EmpleadoSerializer
 from .empleado_turno import EmpleadoTurnoSerializer
-
+from .notificacion_sistema import NotificacionSistemaSerializer
 

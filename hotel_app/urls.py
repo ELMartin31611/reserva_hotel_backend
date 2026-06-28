@@ -11,6 +11,7 @@ from hotel_app.views import (
     TipoHabitacionCamaViewSet,
     ImagenHabitacionViewSet,
     ServicioViewSet,
+    NotificacionSistemaViewSet
 )
 
 router = DefaultRouter()
@@ -126,6 +127,12 @@ from hotel_app.views import (
     TurnoViewSet,
     EmpleadoViewSet,
     EmpleadoTurnoViewSet
+)
+
+router.register(
+    r'notificaciones-sistema',
+    NotificacionSistemaViewSet,
+    basename='notificaciones-sistema'
 )
 
 router = DefaultRouter()
