@@ -1,3 +1,8 @@
+
+from .tipo_habitacion_servicio import TipoHabitacionServicio
+from .temporada import Temporada
+from .tarifa_habitacion import TarifaHabitacion
+
 from .perfil_usuario import PerfilUsuario
 
 from .cliente import Cliente
