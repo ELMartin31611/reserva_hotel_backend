@@ -1,10 +1,10 @@
-from rest_framework import viewsets
+from rest_framework import serializers
 
 from hotel_app.models import DocumentoCliente
-from hotel_app.serializers import DocumentoClienteSerializer
 
 
-class DocumentoClienteViewSet(viewsets.ModelViewSet):
+class DocumentoClienteSerializer(serializers.ModelSerializer):
 
-    queryset = DocumentoCliente.objects.all()
-    serializer_class = DocumentoClienteSerializer
+    class Meta:
+        model = DocumentoCliente
+        fields = '__all__'
