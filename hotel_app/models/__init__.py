@@ -27,6 +27,6 @@ from .cargo_empleado import CargoEmpleado
 from .turno import Turno
 from .empleado import Empleado
 from .empleado_turno import EmpleadoTurno
-
+from .notificacion_sistema import NotificacionSistema
 
 
