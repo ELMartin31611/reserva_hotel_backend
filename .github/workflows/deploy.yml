@@ -1,0 +1,143 @@
+name: Reserva Hotel API - CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Ejecutar pruebas
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: reserva_hotel_test_db
+          POSTGRES_USER: reserva_hotel_user
+          POSTGRES_PASSWORD: reserva_hotel_test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Instalar Python
+        run: uv python install 3.12
+
+      - name: Instalar dependencias
+        run: uv sync --frozen
+
+      - name: Verificar configuración de Django
+        env:
+          SECRET_KEY: test-secret-key-ci-only
+          DEBUG: "True"
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          DB_NAME: reserva_hotel_test_db
+          DB_USER: reserva_hotel_user
+          DB_PASSWORD: reserva_hotel_test_pass
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          TEST_DB_NAME: reserva_hotel_test_db
+          CORS_ALLOW_ALL_ORIGINS: "True"
+        run: uv run python manage.py check
+
+      - name: Ejecutar pruebas
+        env:
+          SECRET_KEY: test-secret-key-ci-only
+          DEBUG: "True"
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          DB_NAME: reserva_hotel_test_db
+          DB_USER: reserva_hotel_user
+          DB_PASSWORD: reserva_hotel_test_pass
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          TEST_DB_NAME: reserva_hotel_test_db
+          CORS_ALLOW_ALL_ORIGINS: "True"
+        run: uv run python manage.py test --verbosity=2
+
+  deploy:
+    name: Desplegar en la VM
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Configurar conexión SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Actualizar backend
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh "$VPS_USERNAME@$VPS_HOST" "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'ENDSSH'
+            set -e
+
+            echo "1. Entrando al proyecto"
+            cd "$DEPLOY_PATH"
+
+            echo "2. Descargando cambios"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+
+            echo "3. Instalando dependencias"
+            /root/.local/bin/uv sync --frozen
+
+            echo "4. Verificando Django"
+            /root/.local/bin/uv run python manage.py check
+
+            echo "5. Aplicando migraciones"
+            /root/.local/bin/uv run python manage.py migrate --noinput
+
+            echo "6. Recolectando archivos estáticos"
+            /root/.local/bin/uv run python manage.py collectstatic --noinput
+
+            echo "7. Reiniciando Gunicorn"
+            systemctl restart gunicorn-reserva-hotel
+
+            echo "8. Verificando servicio"
+            systemctl is-active --quiet gunicorn-reserva-hotel
+
+            echo "9. Verificando API"
+            for intento in 1 2 3 4 5; do
+              if curl --fail --silent --show-error \
+                https://staybooking-api.uaeftt-ute.site/api/health/; then
+                echo
+                echo "Despliegue completado correctamente"
+                exit 0
+              fi
+
+              echo "Intento $intento fallido; reintentando..."
+              sleep 3
+            done
+
+            echo "La API no respondió después del despliegue"
+            journalctl -u gunicorn-reserva-hotel --no-pager -n 30
+            exit 1
+          ENDSSH
