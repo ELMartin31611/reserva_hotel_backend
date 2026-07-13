@@ -1,13 +1,21 @@
-
 from datetime import timedelta
 from pathlib import Path
-from decouple import config, Csv
+
+from decouple import Csv, config
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY    = config('SECRET_KEY')
-DEBUG         = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config(
+    'DEBUG',
+    default=False,
+    cast=bool,
+)
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    cast=Csv(),
+)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -17,7 +25,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # DRF y librerías
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -25,7 +32,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
 
-    # App principal del proyecto
     'hotel_app',
 ]
 
@@ -45,41 +51,53 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
-TEMPLATES = [{
-    'BACKEND': 'django.template.backends.django.DjangoTemplates',
-    'DIRS': [],
-    'APP_DIRS': True,
-    'OPTIONS': {'context_processors': [
-        'django.template.context_processors.debug',
-        'django.template.context_processors.request',
-        'django.contrib.auth.context_processors.auth',
-        'django.contrib.messages.context_processors.messages',
-    ]},
-}]
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE':   'django.db.backends.postgresql',
-        'NAME':     config('DB_NAME'),
-        'USER':     config('DB_USER'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST':     config('DB_HOST', default='localhost'),
-        'PORT':     config('DB_PORT', default='5432'),
-    }
+        'HOST': config(
+            'DB_HOST',
+            default='localhost',
+        ),
+        'PORT': config(
+            'DB_PORT',
+            default='5432',
+        ),
+    },
 }
 
-LANGUAGE_CODE      = 'es-ec'
-TIME_ZONE          = 'America/Guayaquil'
-USE_I18N           = True
-USE_TZ             = True
+LANGUAGE_CODE = 'es-ec'
+TIME_ZONE = 'America/Guayaquil'
+USE_I18N = True
+USE_TZ = True
 
-STATIC_URL         = '/static/'
-STATIC_ROOT        = BASE_DIR / 'staticfiles'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL          = '/media/'
-MEDIA_ROOT         = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -98,26 +116,43 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
 
-    'DEFAULT_PAGINATION_CLASS': 'hotel_app.pagination.StandardPagination',
+    'DEFAULT_PAGINATION_CLASS': (
+        'hotel_app.pagination.StandardPagination'
+    ),
+
     'PAGE_SIZE': 10,
 
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': (
+        'drf_spectacular.openapi.AutoSchema'
+    ),
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME':    timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME':   timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS':    True,
+    'ACCESS_TOKEN_LIFETIME': timedelta(
+        minutes=60,
+    ),
+
+    'REFRESH_TOKEN_LIFETIME': timedelta(
+        days=1,
+    ),
+
+    'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'ALGORITHM':                'HS256',
-    'AUTH_HEADER_TYPES':        ('Bearer',),
-    'USER_ID_FIELD':            'id',
-    'USER_ID_CLAIM':            'user_id',
+    'ALGORITHM': 'HS256',
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Reserva Hotel API',
-    'DESCRIPTION': 'API REST para la gestión de reservas de hotel con Django REST Framework, PostgreSQL y JWT.',
+
+    'DESCRIPTION': (
+        'API REST para la gestión de reservas '
+        'de hotel con Django REST Framework, '
+        'PostgreSQL y JWT.'
+    ),
+
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
@@ -125,7 +160,7 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOW_ALL_ORIGINS = config(
     'CORS_ALLOW_ALL_ORIGINS',
     default=False,
-    cast=bool
+    cast=bool,
 )
 
 CORS_ALLOW_CREDENTIALS = True

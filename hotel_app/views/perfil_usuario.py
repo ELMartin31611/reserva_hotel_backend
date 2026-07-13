@@ -1,9 +1,18 @@
 from rest_framework import generics, viewsets
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import (
+    FormParser,
+    JSONParser,
+    MultiPartParser,
+)
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+)
 
 from hotel_app.models import PerfilUsuario
 from hotel_app.permissions import IsAdminOrReadOnly
-from hotel_app.serializers import (
+from hotel_app.serializers.perfil_usuario import (
+    PerfilActualSerializer,
     PerfilUsuarioSerializer,
     RegistroSerializer,
 )
@@ -14,9 +23,15 @@ class RegistroView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
-class PerfilView(generics.RetrieveAPIView):
-    serializer_class = PerfilUsuarioSerializer
+class PerfilView(generics.RetrieveUpdateAPIView):
+    serializer_class = PerfilActualSerializer
     permission_classes = [IsAuthenticated]
+
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+        JSONParser,
+    ]
 
     def get_object(self):
         user = self.request.user
@@ -35,9 +50,12 @@ class PerfilView(generics.RetrieveAPIView):
             },
         )
 
-        if (user.is_staff or user.is_superuser) and perfil.rol != 'ADMIN':
+        if (
+            user.is_staff or user.is_superuser
+        ) and perfil.rol != 'ADMIN':
             perfil.rol = 'ADMIN'
             perfil.estado = 'ACTIVO'
+
             perfil.save(
                 update_fields=[
                     'rol',
@@ -50,9 +68,18 @@ class PerfilView(generics.RetrieveAPIView):
 
 
 class PerfilUsuarioViewSet(viewsets.ModelViewSet):
-    queryset = PerfilUsuario.objects.select_related('user').all()
+    queryset = PerfilUsuario.objects.select_related(
+        'user',
+    ).all()
+
     serializer_class = PerfilUsuarioSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+        JSONParser,
+    ]
 
     filterset_fields = [
         'rol',
