@@ -1,9 +1,12 @@
 from rest_framework import generics, viewsets
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from hotel_app.models import PerfilUsuario
-from hotel_app.serializers import RegistroSerializer, PerfilUsuarioSerializer
 from hotel_app.permissions import IsAdminOrReadOnly
+from hotel_app.serializers import (
+    PerfilUsuarioSerializer,
+    RegistroSerializer,
+)
 
 
 class RegistroView(generics.CreateAPIView):
@@ -16,7 +19,34 @@ class PerfilView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        return self.request.user.perfil
+        user = self.request.user
+
+        rol_inicial = (
+            'ADMIN'
+            if user.is_staff or user.is_superuser
+            else 'USUARIO'
+        )
+
+        perfil, _ = PerfilUsuario.objects.get_or_create(
+            user=user,
+            defaults={
+                'rol': rol_inicial,
+                'estado': 'ACTIVO',
+            },
+        )
+
+        if (user.is_staff or user.is_superuser) and perfil.rol != 'ADMIN':
+            perfil.rol = 'ADMIN'
+            perfil.estado = 'ACTIVO'
+            perfil.save(
+                update_fields=[
+                    'rol',
+                    'estado',
+                    'updated_at',
+                ],
+            )
+
+        return perfil
 
 
 class PerfilUsuarioViewSet(viewsets.ModelViewSet):
