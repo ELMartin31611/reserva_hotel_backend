@@ -1,0 +1,389 @@
+﻿===== hotel_app\models\hotel.py =====
+from django.db import models
+
+
+class Hotel(models.Model):
+    nombre = models.CharField(max_length=150)
+    ruc = models.CharField(max_length=20)
+    telefono = models.CharField(max_length=20)
+    email = models.EmailField(max_length=254)
+    descripcion = models.TextField()
+    categoria_estrellas = models.IntegerField()
+    sitio_web = models.URLField(max_length=255)
+    logo_url = models.URLField(max_length=255)
+    estado = models.CharField(max_length=20)
+    hora_check_in = models.TimeField()
+    hora_check_out = models.TimeField()
+    permite_mascotas = models.BooleanField(default=False)
+    edad_minima_reserva = models.IntegerField()
+    politica_cancelacion = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "hotel"
+        verbose_name = "Hotel"
+        verbose_name_plural = "Hoteles"
+
+    def __str__(self):
+        return self.nombre
+
+===== hotel_app\serializers\hotel.py =====
+from rest_framework import serializers
+
+from hotel_app.models.hotel import Hotel
+
+
+class HotelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Hotel
+        fields = "__all__"
+
+===== hotel_app\views\hotel.py =====
+from rest_framework.viewsets import ModelViewSet
+
+from hotel_app.models.hotel import Hotel
+from hotel_app.serializers.hotel import HotelSerializer
+
+
+class HotelViewSet(ModelViewSet):
+    queryset = Hotel.objects.all()
+    serializer_class = HotelSerializer
+
+    filterset_fields = [
+        "estado",
+        "categoria_estrellas",
+        "permite_mascotas",
+    ]
+
+    search_fields = [
+        "nombre",
+        "ruc",
+        "telefono",
+        "email",
+        "descripcion",
+    ]
+
+    ordering_fields = [
+        "id",
+        "nombre",
+        "categoria_estrellas",
+        "created_at",
+        "updated_at",
+    ]
+
+    ordering = ["id"]
+
+===== hotel_app\models\imagen_habitacion.py =====
+from pathlib import Path
+from uuid import uuid4
+
+from django.db import models
+
+from hotel_app.models.habitacion import Habitacion
+from hotel_app.validators import validate_image_file
+
+
+def habitacion_image_upload_path(instance, filename):
+    extension = Path(filename).suffix.lower()
+    habitacion_id = instance.habitacion_id or 'sin-habitacion'
+    unique_name = f'{uuid4().hex}{extension}'
+
+    return (
+        f'habitaciones/'
+        f'{habitacion_id}/'
+        f'{unique_name}'
+    )
+
+
+class ImagenHabitacion(models.Model):
+    habitacion = models.ForeignKey(
+        Habitacion,
+        on_delete=models.CASCADE,
+        related_name='imagenes',
+    )
+
+    imagen_url = models.ImageField(
+        upload_to=habitacion_image_upload_path,
+        max_length=255,
+        validators=[validate_image_file],
+    )
+
+    titulo = models.CharField(
+        max_length=100,
+    )
+
+    descripcion = models.TextField(
+        blank=True,
+        default='',
+    )
+
+    orden = models.PositiveIntegerField(
+        default=0,
+    )
+
+    es_principal = models.BooleanField(
+        default=False,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        db_table = 'imagen_habitacion'
+        verbose_name = 'Imagen de HabitaciÃ³n'
+        verbose_name_plural = 'ImÃ¡genes de HabitaciÃ³n'
+        ordering = [
+            'orden',
+            'id',
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.habitacion.numero} - '
+            f'{self.titulo}'
+        )
+
+===== hotel_app\serializers\imagen_habitacion.py =====
+from django.db import transaction
+from rest_framework import serializers
+
+from hotel_app.models.imagen_habitacion import ImagenHabitacion
+
+
+class ImagenHabitacionSerializer(serializers.ModelSerializer):
+    imagen = serializers.ImageField(
+        source='imagen_url',
+        write_only=True,
+        required=True,
+    )
+
+    imagen_url = serializers.SerializerMethodField(
+        read_only=True,
+    )
+
+    habitacion_numero = serializers.CharField(
+        source='habitacion.numero',
+        read_only=True,
+    )
+
+    class Meta:
+        model = ImagenHabitacion
+
+        fields = [
+            'id',
+            'habitacion',
+            'habitacion_numero',
+            'imagen',
+            'imagen_url',
+            'titulo',
+            'descripcion',
+            'orden',
+            'es_principal',
+            'created_at',
+            'updated_at',
+        ]
+
+        read_only_fields = [
+            'id',
+            'habitacion_numero',
+            'imagen_url',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_imagen_url(self, obj):
+        if not obj.imagen_url:
+            return None
+
+        try:
+            image_url = obj.imagen_url.url
+        except ValueError:
+            return None
+
+        request = self.context.get('request')
+
+        if request is not None:
+            return request.build_absolute_uri(image_url)
+
+        return image_url
+
+    def validate_orden(self, value):
+        if value < 0:
+            raise serializers.ValidationError(
+                'El orden no puede ser negativo.'
+            )
+
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        imagen = super().create(validated_data)
+
+        if imagen.es_principal:
+            ImagenHabitacion.objects.filter(
+                habitacion=imagen.habitacion,
+                es_principal=True,
+            ).exclude(
+                id=imagen.id,
+            ).update(
+                es_principal=False,
+            )
+
+        return imagen
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        imagen = super().update(
+            instance,
+            validated_data,
+        )
+
+        if imagen.es_principal:
+            ImagenHabitacion.objects.filter(
+                habitacion=imagen.habitacion,
+                es_principal=True,
+            ).exclude(
+                id=imagen.id,
+            ).update(
+                es_principal=False,
+            )
+
+        return imagen
+
+===== hotel_app\views\imagen_habitacion.py =====
+from rest_framework.parsers import (
+    FormParser,
+    JSONParser,
+    MultiPartParser,
+)
+from rest_framework.viewsets import ModelViewSet
+
+from hotel_app.models.imagen_habitacion import ImagenHabitacion
+from hotel_app.permissions import IsAdminOrReadOnly
+from hotel_app.serializers.imagen_habitacion import (
+    ImagenHabitacionSerializer,
+)
+
+
+class ImagenHabitacionViewSet(ModelViewSet):
+    queryset = ImagenHabitacion.objects.select_related(
+        'habitacion',
+        'habitacion__hotel',
+        'habitacion__tipo_habitacion',
+    ).all()
+
+    serializer_class = ImagenHabitacionSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+        JSONParser,
+    ]
+
+    filterset_fields = [
+        'habitacion',
+        'es_principal',
+    ]
+
+    search_fields = [
+        'titulo',
+        'descripcion',
+        'habitacion__numero',
+    ]
+
+    ordering_fields = [
+        'id',
+        'orden',
+        'created_at',
+        'updated_at',
+    ]
+
+    ordering = [
+        'orden',
+        'id',
+    ]
+
+===== hotel_app\models\tipo_habitacion.py =====
+from django.db import models
+
+from hotel_app.models.hotel import Hotel
+
+
+class TipoHabitacion(models.Model):
+    hotel = models.ForeignKey(
+        Hotel,
+        on_delete=models.CASCADE,
+        related_name="tipos_habitacion"
+    )
+
+    nombre = models.CharField(max_length=80)
+    descripcion = models.TextField()
+    capacidad_adultos = models.IntegerField()
+    capacidad_ninos = models.IntegerField()
+    capacidad_total = models.IntegerField()
+    tamano_m2 = models.DecimalField(max_digits=6, decimal_places=2)
+    precio_base = models.DecimalField(max_digits=10, decimal_places=2)
+    estado = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "tipo_habitacion"
+        verbose_name = "Tipo de HabitaciÃ³n"
+        verbose_name_plural = "Tipos de HabitaciÃ³n"
+
+    def __str__(self):
+        return self.nombre
+
+===== hotel_app\serializers\tipo_habitacion.py =====
+from rest_framework import serializers
+
+from hotel_app.models.tipo_habitacion import TipoHabitacion
+
+
+class TipoHabitacionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoHabitacion
+        fields = "__all__"
+
+===== hotel_app\views\tipo_habitacion.py =====
+from rest_framework.viewsets import ModelViewSet
+
+from hotel_app.models.tipo_habitacion import TipoHabitacion
+from hotel_app.serializers.tipo_habitacion import TipoHabitacionSerializer
+
+
+class TipoHabitacionViewSet(ModelViewSet):
+    queryset = TipoHabitacion.objects.all()
+    serializer_class = TipoHabitacionSerializer
+
+    filterset_fields = [
+        "hotel",
+        "estado",
+        "capacidad_total",
+    ]
+
+    search_fields = [
+        "nombre",
+        "descripcion",
+        "estado",
+    ]
+
+    ordering_fields = [
+        "id",
+        "nombre",
+        "precio_base",
+        "capacidad_total",
+        "created_at",
+        "updated_at",
+    ]
+
+    ordering = ["id"]
+
