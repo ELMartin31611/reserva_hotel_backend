@@ -96,6 +96,21 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Nginx recibe la conexión HTTPS y la reenvía a Gunicorn.
+# Esta configuración permite que Django genere URLs HTTPS
+# correctas para las imágenes cargadas.
+SECURE_PROXY_SSL_HEADER = (
+    'HTTP_X_FORWARDED_PROTO',
+    'https',
+)
+USE_X_FORWARDED_HOST = True
+
+# Los archivos deben poder ser leídos por Nginx después
+# de que Django los guarde.
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
+# Límite de 2 MB por imagen y 3 MB para la petición completa.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024
 
