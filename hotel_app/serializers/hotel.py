@@ -4,19 +4,25 @@ from hotel_app.models.hotel import Hotel
 
 
 class HotelSerializer(serializers.ModelSerializer):
+    """
+    Serializer para consultar y administrar hoteles.
+
+    El logo se recibe como archivo multipart mediante el campo
+    `logo`. La respuesta devuelve la dirección pública mediante
+    `logo_url`.
+    """
+
     logo = serializers.ImageField(
         write_only=True,
         required=False,
         allow_null=True,
     )
-
     logo_url = serializers.SerializerMethodField(
         read_only=True,
     )
 
     class Meta:
         model = Hotel
-
         fields = [
             'id',
             'nombre',
@@ -37,14 +43,12 @@ class HotelSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-
         read_only_fields = [
             'id',
             'logo_url',
             'created_at',
             'updated_at',
         ]
-
         extra_kwargs = {
             'sitio_web': {
                 'required': False,
@@ -53,17 +57,50 @@ class HotelSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        """
+        Obliga a seleccionar un logo cuando se crea un hotel.
+
+        Al editarlo se permite conservar el logo existente.
+        """
         if self.instance is None and not attrs.get('logo'):
             raise serializers.ValidationError({
                 'logo': (
-                    'Debes seleccionar una imagen para el logo '
-                    'del hotel.'
+                    'Debes seleccionar una imagen para el '
+                    'logo del hotel.'
                 ),
             })
 
         return attrs
 
-    def get_logo_url(self, obj):
+    def create(self, validated_data):
+        """
+        Primero crea el hotel para obtener su ID.
+
+        Después guarda el logo, permitiendo que `upload_to`
+        genere una ruta como hoteles/5/imagen.png en lugar
+        de hoteles/sin-hotel/imagen.png.
+        """
+        logo = validated_data.pop('logo', None)
+
+        hotel = Hotel.objects.create(
+            **validated_data,
+        )
+
+        if logo is not None:
+            hotel.logo = logo
+            hotel.save(
+                update_fields=[
+                    'logo',
+                    'updated_at',
+                ],
+            )
+
+        return hotel
+
+    def get_logo_url(self, obj) -> str | None:
+        """
+        Devuelve una URL absoluta HTTPS para el logo.
+        """
         if obj.logo:
             try:
                 image_url = obj.logo.url
@@ -74,7 +111,9 @@ class HotelSerializer(serializers.ModelSerializer):
                 request = self.context.get('request')
 
                 if request is not None:
-                    return request.build_absolute_uri(image_url)
+                    return request.build_absolute_uri(
+                        image_url,
+                    )
 
                 return image_url
 
