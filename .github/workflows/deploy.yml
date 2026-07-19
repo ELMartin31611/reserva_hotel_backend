@@ -57,7 +57,7 @@ jobs:
           CORS_ALLOW_ALL_ORIGINS: "True"
         run: uv run python manage.py check
 
-      - name: Ejecutar pruebas
+      - name: Ejecutar pruebas existentes
         env:
           SECRET_KEY: test-secret-key-ci-only
           DEBUG: "True"
@@ -118,13 +118,18 @@ jobs:
             echo "6. Recolectando archivos estáticos"
             /root/.local/bin/uv run python manage.py collectstatic --noinput
 
-            echo "7. Reiniciando Gunicorn"
+            echo "7. Preparando archivos multimedia"
+            mkdir -p media
+            find media -type d -exec chmod 755 {} \;
+            find media -type f -exec chmod 644 {} \;
+
+            echo "8. Reiniciando Gunicorn"
             systemctl restart gunicorn-reserva-hotel
 
-            echo "8. Verificando servicio"
+            echo "9. Verificando servicio"
             systemctl is-active --quiet gunicorn-reserva-hotel
 
-            echo "9. Verificando API"
+            echo "10. Verificando API"
             for intento in 1 2 3 4 5; do
               if curl --fail --silent --show-error \
                 https://staybooking-api.uaeftt-ute.site/api/health/; then
