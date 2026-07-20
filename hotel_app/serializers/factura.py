@@ -1,13 +1,18 @@
 from rest_framework import serializers
-from hotel_app.models.factura import Factura
+
+from hotel_app.models import Factura
 
 
-class FacturaSerializer(serializers.ModelSerializer):
+class FacturaSerializer(
+    serializers.ModelSerializer
+):
     reserva_codigo = serializers.CharField(
         source='reserva.codigo',
-        read_only=True
+        read_only=True,
     )
-    cliente_nombre = serializers.SerializerMethodField()
+    cliente_nombre = (
+        serializers.SerializerMethodField()
+    )
 
     class Meta:
         model = Factura
@@ -27,17 +32,19 @@ class FacturaSerializer(serializers.ModelSerializer):
             'impuestos',
             'descuento',
             'total',
+            'moneda',
             'metodo_pago',
             'estado',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = [
-            'numero_factura',
-            'fecha_emision',
-            'created_at',
-            'updated_at',
-        ]
+        read_only_fields = fields
 
-    def get_cliente_nombre(self, obj):
-        return f'{obj.cliente.nombres} {obj.cliente.apellidos}'
+    def get_cliente_nombre(
+        self,
+        obj,
+    ) -> str:
+        return (
+            f'{obj.cliente.nombres} '
+            f'{obj.cliente.apellidos}'
+        ).strip()
