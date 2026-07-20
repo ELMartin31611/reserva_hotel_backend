@@ -19,19 +19,20 @@ from hotel_app.models import (
 
 
 MONEY_QUANTUM = Decimal('0.01')
-CHILD_PRICE_FACTOR = Decimal('0.50')
+EXTRA_GUEST_PRICE_FACTOR = Decimal('0.50')
 TAX_RATE = Decimal('0.12')
 MAX_STAY_NIGHTS = 30
 
-UNAVAILABLE_ROOM_STATES = {
+NON_BOOKABLE_ROOM_STATES = {
     'mantenimiento',
-    'en mantenimiento',
-    'fuera de servicio',
     'inactiva',
     'inactivo',
+    'ocupada',
+    'ocupado',
     'bloqueada',
     'bloqueado',
-    'no disponible',
+    'fuera de servicio',
+    'fuera_servicio',
 }
 
 
@@ -39,19 +40,6 @@ def money(value):
     return Decimal(value).quantize(
         MONEY_QUANTUM,
         rounding=ROUND_HALF_UP,
-    )
-
-
-def normalize_room_state(
-    value,
-):
-    return ' '.join(
-        str(value)
-        .strip()
-        .lower()
-        .replace('_', ' ')
-        .replace('-', ' ')
-        .split()
     )
 
 
@@ -63,9 +51,8 @@ class ReservationCreationService:
         user,
         validated_data,
     ):
-        customer = (
-            Cliente.objects
-            .select_related(
+        cliente = (
+            Cliente.objects.select_related(
                 'perfil',
                 'perfil__user',
             )
@@ -76,7 +63,7 @@ class ReservationCreationService:
             .first()
         )
 
-        if customer is None:
+        if cliente is None:
             raise serializers.ValidationError({
                 'cliente': (
                     'Completa tus datos de cliente '
@@ -84,22 +71,19 @@ class ReservationCreationService:
                 ),
             })
 
-        check_in = validated_data[
-            'fecha_entrada'
-        ]
-        check_out = validated_data[
-            'fecha_salida'
-        ]
-        assignments = validated_data[
-            'habitaciones'
-        ]
-        guests = validated_data[
-            'huespedes'
-        ]
+        fecha_entrada = (
+            validated_data['fecha_entrada']
+        )
+        fecha_salida = (
+            validated_data['fecha_salida']
+        )
+        assignments = (
+            validated_data['habitaciones']
+        )
+        guests = validated_data['huespedes']
 
         nights = (
-            check_out
-            - check_in
+            fecha_salida - fecha_entrada
         ).days
 
         if (
@@ -114,8 +98,8 @@ class ReservationCreationService:
             })
 
         room_ids = [
-            assignment['habitacion_id']
-            for assignment in assignments
+            item['habitacion_id']
+            for item in assignments
         ]
 
         if (
@@ -136,10 +120,7 @@ class ReservationCreationService:
                 'hotel',
                 'tipo_habitacion',
             )
-            .filter(
-                id__in=room_ids,
-            )
-            .order_by('id')
+            .filter(id__in=room_ids)
         )
 
         rooms_by_id = {
@@ -147,12 +128,12 @@ class ReservationCreationService:
             for room in rooms
         }
 
-        missing_room_ids = (
+        missing_rooms = (
             set(room_ids)
             - set(rooms_by_id)
         )
 
-        if missing_room_ids:
+        if missing_rooms:
             raise serializers.ValidationError({
                 'habitaciones': (
                     'Una o más habitaciones '
@@ -187,24 +168,23 @@ class ReservationCreationService:
             children = assignment[
                 'cantidad_ninos'
             ]
-            room_type = (
-                room.tipo_habitacion
-            )
+            total_guests = adults + children
+            room_type = room.tipo_habitacion
 
             room_state = (
-                normalize_room_state(
-                    room.estado,
-                )
+                room.estado
+                .strip()
+                .lower()
             )
 
             if (
                 room_state
-                in UNAVAILABLE_ROOM_STATES
+                in NON_BOOKABLE_ROOM_STATES
             ):
                 raise serializers.ValidationError({
                     'habitaciones': (
                         f'La habitación {room.numero} '
-                        'no está habilitada para reservas.'
+                        'no está disponible.'
                     ),
                 })
 
@@ -217,49 +197,64 @@ class ReservationCreationService:
                 })
 
             if (
-                adults
-                > room_type.capacidad_adultos
+                children > 0
+                and room_type.capacidad_ninos <= 0
             ):
                 raise serializers.ValidationError({
                     'habitaciones': (
                         f'La habitación {room.numero} '
-                        'admite máximo '
-                        f'{room_type.capacidad_adultos} '
-                        'adulto(s).'
+                        'no permite niños.'
                     ),
                 })
 
-            if (
-                children
-                > room_type.capacidad_ninos
-            ):
+            maximum_adults = (
+                room_type.capacidad_adultos
+                + room_type.capacidad_extra
+            )
+            maximum_children = (
+                room_type.capacidad_ninos
+                + room_type.capacidad_extra
+            )
+            maximum_guests = (
+                room_type.capacidad_total
+                + room_type.capacidad_extra
+            )
+
+            if adults > maximum_adults:
                 raise serializers.ValidationError({
                     'habitaciones': (
                         f'La habitación {room.numero} '
-                        'admite máximo '
-                        f'{room_type.capacidad_ninos} '
-                        'niño(s).'
+                        f'admite máximo '
+                        f'{maximum_adults} adulto(s).'
                     ),
                 })
 
-            if (
-                adults + children
-                > room_type.capacidad_total
-            ):
+            if children > maximum_children:
                 raise serializers.ValidationError({
                     'habitaciones': (
-                        'La capacidad total de la '
-                        f'habitación {room.numero} es '
-                        f'{room_type.capacidad_total}.'
+                        f'La habitación {room.numero} '
+                        f'admite máximo '
+                        f'{maximum_children} niño(s).'
+                    ),
+                })
+
+            if total_guests > maximum_guests:
+                raise serializers.ValidationError({
+                    'habitaciones': (
+                        f'La habitación {room.numero} '
+                        f'admite máximo '
+                        f'{maximum_guests} huésped(es): '
+                        f'{room_type.capacidad_total} '
+                        'incluidos y '
+                        f'{room_type.capacidad_extra} '
+                        'extra.'
                     ),
                 })
 
             adults_total += adults
             children_total += children
 
-            expected_guests_by_room[
-                room.id
-            ] = {
+            expected_guests_by_room[room.id] = {
                 'adulto': adults,
                 'nino': children,
             }
@@ -272,10 +267,10 @@ class ReservationCreationService:
                     'confirmada',
                 ],
                 reserva__fecha_entrada__lt=(
-                    check_out
+                    fecha_salida
                 ),
                 reserva__fecha_salida__gt=(
-                    check_in
+                    fecha_entrada
                 ),
             ).values_list(
                 'habitacion_id',
@@ -285,17 +280,15 @@ class ReservationCreationService:
 
         if occupied_room_ids:
             occupied_numbers = [
-                rooms_by_id[
-                    room_id
-                ].numero
+                rooms_by_id[room_id].numero
                 for room_id
                 in occupied_room_ids
             ]
 
             raise serializers.ValidationError({
                 'disponibilidad': (
-                    'Ya no están disponibles las '
-                    'habitaciones: '
+                    'Ya no están disponibles '
+                    'las habitaciones: '
                     f'{", ".join(occupied_numbers)}.'
                 ),
             })
@@ -315,7 +308,6 @@ class ReservationCreationService:
 
         rates = (
             TarifaHabitacion.objects
-            .select_for_update()
             .select_related(
                 'temporada',
                 'tipo_habitacion',
@@ -327,22 +319,23 @@ class ReservationCreationService:
                 is_active=True,
                 temporada__is_active=True,
                 temporada__fecha_inicio__lt=(
-                    check_out
+                    fecha_salida
                 ),
                 temporada__fecha_fin__gt=(
-                    check_in
+                    fecha_entrada
                 ),
             )
             .order_by(
-                '-temporada__porcentaje_incremento',
+                '-temporada'
+                '__porcentaje_incremento',
                 '-id',
             )
         )
 
-        rates_by_room_type = {}
+        rates_by_type = {}
 
         for rate in rates:
-            rates_by_room_type.setdefault(
+            rates_by_type.setdefault(
                 rate.tipo_habitacion_id,
                 [],
             ).append(rate)
@@ -363,18 +356,16 @@ class ReservationCreationService:
                 children=assignment[
                     'cantidad_ninos'
                 ],
-                check_in=check_in,
+                check_in=fecha_entrada,
                 nights=nights,
-                rates=(
-                    rates_by_room_type.get(
-                        room.tipo_habitacion_id,
-                        [],
-                    )
+                rates=rates_by_type.get(
+                    room.tipo_habitacion_id,
+                    [],
                 ),
             )
 
             currencies.add(
-                pricing['currency'],
+                pricing['currency']
             )
 
             priced_assignments.append({
@@ -391,20 +382,20 @@ class ReservationCreationService:
                 ),
             })
 
-        adults_subtotal = money(
+        room_base_subtotal = money(
             sum(
                 (
-                    item['adult_subtotal']
+                    item['room_subtotal']
                     for item
                     in priced_assignments
                 ),
                 Decimal('0.00'),
             )
         )
-        children_subtotal = money(
+        extra_guests_subtotal = money(
             sum(
                 (
-                    item['child_subtotal']
+                    item['extra_guests_subtotal']
                     for item
                     in priced_assignments
                 ),
@@ -412,23 +403,21 @@ class ReservationCreationService:
             )
         )
         subtotal = money(
-            adults_subtotal
-            + children_subtotal
+            room_base_subtotal
+            + extra_guests_subtotal
         )
         taxes = money(
-            subtotal
-            * TAX_RATE
+            subtotal * TAX_RATE
         )
         total = money(
-            subtotal
-            + taxes
+            subtotal + taxes
         )
         currency = currencies.pop()
 
         reservation = Reserva.objects.create(
-            cliente=customer,
-            fecha_entrada=check_in,
-            fecha_salida=check_out,
+            cliente=cliente,
+            fecha_entrada=fecha_entrada,
+            fecha_salida=fecha_salida,
             numero_noches=nights,
             cantidad_adultos=adults_total,
             cantidad_ninos=children_total,
@@ -449,7 +438,7 @@ class ReservationCreationService:
         reservation_rooms = []
 
         for item in priced_assignments:
-            reservation_room = (
+            reservation_rooms.append(
                 ReservaHabitacion.objects.create(
                     reserva=reservation,
                     habitacion=item['room'],
@@ -468,11 +457,25 @@ class ReservationCreationService:
                             'cantidad_ninos'
                         ]
                     ),
-                    subtotal_adultos=(
-                        item['adult_subtotal']
+                    cantidad_huespedes_incluidos=(
+                        item['included_guests']
                     ),
-                    subtotal_ninos=(
-                        item['child_subtotal']
+                    cantidad_huespedes_extra=(
+                        item['extra_guests']
+                    ),
+                    subtotal_habitacion=(
+                        item['room_subtotal']
+                    ),
+                    subtotal_huespedes_extra=(
+                        item[
+                            'extra_guests_subtotal'
+                        ]
+                    ),
+                    subtotal_adultos=Decimal(
+                        '0.00'
+                    ),
+                    subtotal_ninos=Decimal(
+                        '0.00'
                     ),
                     subtotal=item['subtotal'],
                     detalle_tarifas=(
@@ -483,11 +486,7 @@ class ReservationCreationService:
                 )
             )
 
-            reservation_rooms.append(
-                reservation_room,
-            )
-
-        reservation_room_by_id = {
+        reservation_room_by_physical_id = {
             item.habitacion_id: item
             for item in reservation_rooms
         }
@@ -496,7 +495,7 @@ class ReservationCreationService:
             HuespedReserva(
                 reserva=reservation,
                 reserva_habitacion=(
-                    reservation_room_by_id[
+                    reservation_room_by_physical_id[
                         guest['habitacion_id']
                     ]
                 ),
@@ -511,11 +510,11 @@ class ReservationCreationService:
                 ),
                 tipo_documento=(
                     guest['tipo_documento']
-                    .strip()
                 ),
                 numero_documento=(
-                    guest['numero_documento']
-                    .strip()
+                    guest[
+                        'numero_documento'
+                    ].strip()
                 ),
                 edad=guest['edad'],
                 telefono=(
@@ -544,10 +543,28 @@ class ReservationCreationService:
         nights,
         rates,
     ):
-        base_total = Decimal('0.00')
+        room_subtotal = Decimal('0.00')
+        extra_guests_subtotal = (
+            Decimal('0.00')
+        )
         breakdown = []
         first_rate = None
         currency = None
+
+        total_guests = adults + children
+        included_capacity = (
+            room.tipo_habitacion
+            .capacidad_total
+        )
+        included_guests = min(
+            total_guests,
+            included_capacity,
+        )
+        extra_guests = max(
+            0,
+            total_guests
+            - included_capacity,
+        )
 
         for offset in range(nights):
             current_date = (
@@ -560,9 +577,11 @@ class ReservationCreationService:
                     item
                     for item in rates
                     if (
-                        item.temporada.fecha_inicio
+                        item.temporada
+                        .fecha_inicio
                         <= current_date
-                        < item.temporada.fecha_fin
+                        < item.temporada
+                        .fecha_fin
                     )
                 ),
                 None,
@@ -571,24 +590,25 @@ class ReservationCreationService:
             if rate is None:
                 raise serializers.ValidationError({
                     'tarifa': (
-                        'No existe tarifa activa para '
-                        f'la habitación {room.numero} '
-                        f'el {current_date.isoformat()}.'
+                        'No existe tarifa activa '
+                        f'para la habitación '
+                        f'{room.numero} el '
+                        f'{current_date.isoformat()}.'
                     ),
                 })
 
-            nightly_price = (
+            nightly_room_price = (
                 rate.precio_fin_semana
                 if (
-                    current_date.weekday()
-                    >= 5
-                    and rate.precio_fin_semana
+                    current_date.weekday() >= 5
+                    and rate
+                    .precio_fin_semana
                     is not None
                 )
                 else rate.precio_noche
             )
-            nightly_price = money(
-                nightly_price,
+            nightly_room_price = money(
+                nightly_room_price
             )
 
             if first_rate is None:
@@ -597,13 +617,31 @@ class ReservationCreationService:
             elif rate.moneda != currency:
                 raise serializers.ValidationError({
                     'moneda': (
-                        'Las tarifas de la habitación '
-                        f'{room.numero} usan monedas '
-                        'diferentes.'
+                        'Las tarifas de la '
+                        f'habitación {room.numero} '
+                        'usan monedas diferentes.'
                     ),
                 })
 
-            base_total += nightly_price
+            extra_guest_unit_charge = money(
+                nightly_room_price
+                * EXTRA_GUEST_PRICE_FACTOR
+            )
+            nightly_extra_total = money(
+                extra_guest_unit_charge
+                * extra_guests
+            )
+            nightly_total = money(
+                nightly_room_price
+                + nightly_extra_total
+            )
+
+            room_subtotal += (
+                nightly_room_price
+            )
+            extra_guests_subtotal += (
+                nightly_extra_total
+            )
 
             breakdown.append({
                 'fecha': (
@@ -613,36 +651,50 @@ class ReservationCreationService:
                 'temporada': (
                     rate.temporada.nombre
                 ),
-                'precio_noche': str(
-                    nightly_price,
+                'precio_habitacion': str(
+                    nightly_room_price
+                ),
+                'huespedes_incluidos': (
+                    included_guests
+                ),
+                'huespedes_extra': (
+                    extra_guests
+                ),
+                'cargo_unitario_extra': str(
+                    extra_guest_unit_charge
+                ),
+                'subtotal_huespedes_extra': str(
+                    nightly_extra_total
+                ),
+                'total_noche': str(
+                    nightly_total
                 ),
                 'moneda': rate.moneda,
             })
 
-        adult_subtotal = money(
-            base_total
-            * adults
+        room_subtotal = money(
+            room_subtotal
         )
-        child_subtotal = money(
-            base_total
-            * children
-            * CHILD_PRICE_FACTOR
+        extra_guests_subtotal = money(
+            extra_guests_subtotal
         )
         subtotal = money(
-            adult_subtotal
-            + child_subtotal
+            room_subtotal
+            + extra_guests_subtotal
         )
 
         return {
             'first_rate': first_rate,
             'average_rate': money(
-                base_total / nights,
+                room_subtotal / nights
             ),
-            'adult_subtotal': (
-                adult_subtotal
+            'included_guests': (
+                included_guests
             ),
-            'child_subtotal': (
-                child_subtotal
+            'extra_guests': extra_guests,
+            'room_subtotal': room_subtotal,
+            'extra_guests_subtotal': (
+                extra_guests_subtotal
             ),
             'subtotal': subtotal,
             'breakdown': breakdown,
@@ -659,8 +711,8 @@ class ReservationCreationService:
         if not guests:
             raise serializers.ValidationError({
                 'huespedes': (
-                    'Debes registrar los huéspedes '
-                    'seleccionados.'
+                    'Debes registrar los '
+                    'huéspedes seleccionados.'
                 ),
             })
 
@@ -677,8 +729,8 @@ class ReservationCreationService:
         ):
             raise serializers.ValidationError({
                 'huespedes': (
-                    'No se puede repetir el documento '
-                    'de un huésped.'
+                    'No se puede repetir el '
+                    'documento de un huésped.'
                 ),
             })
 
@@ -689,19 +741,18 @@ class ReservationCreationService:
         holder_count = 0
 
         for guest in guests:
-            room_id = guest[
-                'habitacion_id'
-            ]
-            guest_type = guest[
-                'tipo_huesped'
-            ]
+            room_id = guest['habitacion_id']
+            guest_type = (
+                guest['tipo_huesped']
+            )
             age = guest['edad']
 
             if room_id not in room_ids:
                 raise serializers.ValidationError({
                     'huespedes': (
-                        'Un huésped está asignado a '
-                        'una habitación no seleccionada.'
+                        'Un huésped está asignado '
+                        'a una habitación no '
+                        'seleccionada.'
                     ),
                 })
 
@@ -711,8 +762,8 @@ class ReservationCreationService:
             ):
                 raise serializers.ValidationError({
                     'huespedes': (
-                        'Los huéspedes adultos deben '
-                        'tener 18 años o más.'
+                        'Los huéspedes adultos '
+                        'deben tener 18 años o más.'
                     ),
                 })
 
@@ -745,8 +796,8 @@ class ReservationCreationService:
         if holder_count != 1:
             raise serializers.ValidationError({
                 'huespedes': (
-                    'Debe existir exactamente un '
-                    'titular adulto.'
+                    'Debe existir exactamente '
+                    'un titular adulto.'
                 ),
             })
 
@@ -754,9 +805,7 @@ class ReservationCreationService:
             room_id,
             expected,
         ) in expected_by_room.items():
-            actual = actual_by_room[
-                room_id
-            ]
+            actual = actual_by_room[room_id]
 
             if (
                 actual['adulto']
@@ -767,7 +816,8 @@ class ReservationCreationService:
                 raise serializers.ValidationError({
                     'huespedes': (
                         'La cantidad de huéspedes '
-                        'registrados no coincide con '
-                        'la selección de cada habitación.'
+                        'registrados no coincide '
+                        'con la selección de cada '
+                        'habitación.'
                     ),
                 })

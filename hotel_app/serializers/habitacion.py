@@ -5,7 +5,9 @@ from rest_framework import serializers
 from hotel_app.models import Habitacion
 
 
-class HabitacionSerializer(serializers.ModelSerializer):
+class HabitacionSerializer(
+    serializers.ModelSerializer
+):
     hotel_nombre = serializers.CharField(
         source='hotel.nombre',
         read_only=True,
@@ -15,15 +17,33 @@ class HabitacionSerializer(serializers.ModelSerializer):
         read_only=True,
     )
     capacidad_adultos = serializers.IntegerField(
-        source='tipo_habitacion.capacidad_adultos',
+        source=(
+            'tipo_habitacion.capacidad_adultos'
+        ),
         read_only=True,
     )
     capacidad_ninos = serializers.IntegerField(
-        source='tipo_habitacion.capacidad_ninos',
+        source=(
+            'tipo_habitacion.capacidad_ninos'
+        ),
         read_only=True,
     )
     capacidad_total = serializers.IntegerField(
-        source='tipo_habitacion.capacidad_total',
+        source=(
+            'tipo_habitacion.capacidad_total'
+        ),
+        read_only=True,
+    )
+    capacidad_extra = serializers.IntegerField(
+        source=(
+            'tipo_habitacion.capacidad_extra'
+        ),
+        read_only=True,
+    )
+    capacidad_maxima = serializers.IntegerField(
+        source=(
+            'tipo_habitacion.capacidad_maxima'
+        ),
         read_only=True,
     )
 
@@ -38,6 +58,8 @@ class HabitacionSerializer(serializers.ModelSerializer):
             'capacidad_adultos',
             'capacidad_ninos',
             'capacidad_total',
+            'capacidad_extra',
+            'capacidad_maxima',
             'numero',
             'piso',
             'estado',
@@ -48,6 +70,13 @@ class HabitacionSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = [
+            'hotel_nombre',
+            'tipo_habitacion_nombre',
+            'capacidad_adultos',
+            'capacidad_ninos',
+            'capacidad_total',
+            'capacidad_extra',
+            'capacidad_maxima',
             'created_at',
             'updated_at',
         ]
@@ -55,15 +84,27 @@ class HabitacionSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         hotel = attrs.get(
             'hotel',
-            getattr(self.instance, 'hotel', None),
+            getattr(
+                self.instance,
+                'hotel',
+                None,
+            ),
         )
         room_type = attrs.get(
             'tipo_habitacion',
-            getattr(self.instance, 'tipo_habitacion', None),
+            getattr(
+                self.instance,
+                'tipo_habitacion',
+                None,
+            ),
         )
         number = attrs.get(
             'numero',
-            getattr(self.instance, 'numero', ''),
+            getattr(
+                self.instance,
+                'numero',
+                '',
+            ),
         ).strip()
 
         if (
@@ -73,8 +114,8 @@ class HabitacionSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError({
                 'tipo_habitacion': (
-                    'El tipo de habitación no pertenece '
-                    'al hotel elegido.'
+                    'El tipo de habitación no '
+                    'pertenece al hotel elegido.'
                 ),
             })
 
@@ -88,10 +129,15 @@ class HabitacionSerializer(serializers.ModelSerializer):
                 pk=self.instance.pk,
             )
 
-        if hotel and number and duplicates.exists():
+        if (
+            hotel
+            and number
+            and duplicates.exists()
+        ):
             raise serializers.ValidationError({
                 'numero': (
-                    'Ya existe esa habitación en el hotel.'
+                    'Ya existe esa habitación '
+                    'en el hotel.'
                 ),
             })
 
@@ -99,8 +145,12 @@ class HabitacionSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class AvailabilityQuerySerializer(serializers.Serializer):
-    hotel = serializers.IntegerField(min_value=1)
+class AvailabilityQuerySerializer(
+    serializers.Serializer
+):
+    hotel = serializers.IntegerField(
+        min_value=1,
+    )
     fecha_entrada = serializers.DateField()
     fecha_salida = serializers.DateField()
     cantidad_adultos = serializers.IntegerField(
@@ -117,15 +167,19 @@ class AvailabilityQuerySerializer(serializers.Serializer):
         if attrs['fecha_entrada'] < date.today():
             raise serializers.ValidationError({
                 'fecha_entrada': (
-                    'La fecha de entrada no puede ser pasada.'
+                    'La fecha de entrada no '
+                    'puede ser pasada.'
                 ),
             })
 
-        if attrs['fecha_salida'] <= attrs['fecha_entrada']:
+        if (
+            attrs['fecha_salida']
+            <= attrs['fecha_entrada']
+        ):
             raise serializers.ValidationError({
                 'fecha_salida': (
-                    'La fecha de salida debe ser mayor '
-                    'que la de entrada.'
+                    'La fecha de salida debe ser '
+                    'mayor que la de entrada.'
                 ),
             })
 
@@ -137,7 +191,8 @@ class AvailabilityQuerySerializer(serializers.Serializer):
         if nights > 30:
             raise serializers.ValidationError({
                 'fecha_salida': (
-                    'La estancia máxima es de 30 noches.'
+                    'La estancia máxima es '
+                    'de 30 noches.'
                 ),
             })
 

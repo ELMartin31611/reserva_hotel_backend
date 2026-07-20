@@ -1,5 +1,9 @@
-from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.exceptions import (
+    ValidationError,
+)
+from django.core.validators import (
+    MinValueValidator,
+)
 from django.db import models
 
 
@@ -13,7 +17,9 @@ class ReservaHabitacion(models.Model):
     reserva = models.ForeignKey(
         'hotel_app.Reserva',
         on_delete=models.CASCADE,
-        related_name='habitaciones_reservadas',
+        related_name=(
+            'habitaciones_reservadas'
+        ),
     )
     habitacion = models.ForeignKey(
         'hotel_app.Habitacion',
@@ -33,12 +39,49 @@ class ReservaHabitacion(models.Model):
         ],
     )
     noches = models.PositiveIntegerField()
-    cantidad_adultos = models.PositiveIntegerField(
-        default=1,
+    cantidad_adultos = (
+        models.PositiveIntegerField(
+            default=1,
+        )
     )
-    cantidad_ninos = models.PositiveIntegerField(
+    cantidad_ninos = (
+        models.PositiveIntegerField(
+            default=0,
+        )
+    )
+
+    cantidad_huespedes_incluidos = (
+        models.PositiveIntegerField(
+            default=0,
+        )
+    )
+    cantidad_huespedes_extra = (
+        models.PositiveIntegerField(
+            default=0,
+        )
+    )
+
+    subtotal_habitacion = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
         default=0,
+        validators=[
+            MinValueValidator(0),
+        ],
     )
+    subtotal_huespedes_extra = (
+        models.DecimalField(
+            max_digits=10,
+            decimal_places=2,
+            default=0,
+            validators=[
+                MinValueValidator(0),
+            ],
+        )
+    )
+
+    # Campos conservados para compatibilidad
+    # con reservas creadas anteriormente.
     subtotal_adultos = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -55,6 +98,7 @@ class ReservaHabitacion(models.Model):
             MinValueValidator(0),
         ],
     )
+
     subtotal = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -75,7 +119,6 @@ class ReservaHabitacion(models.Model):
         max_length=10,
         default='USD',
     )
-
     created_at = models.DateTimeField(
         auto_now_add=True,
     )
@@ -84,7 +127,9 @@ class ReservaHabitacion(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Habitación reservada'
+        verbose_name = (
+            'Habitación reservada'
+        )
         verbose_name_plural = (
             'Habitaciones reservadas'
         )
@@ -95,13 +140,7 @@ class ReservaHabitacion(models.Model):
         ordering = ['id']
 
     def clean(self):
-        if (
-            not self.reserva_id
-            or not self.habitacion_id
-        ):
-            return
-
-        existe_cruce = (
+        has_conflict = (
             ReservaHabitacion.objects.filter(
                 habitacion=self.habitacion,
                 reserva__estado__in=[
@@ -119,10 +158,10 @@ class ReservaHabitacion(models.Model):
             .exists()
         )
 
-        if existe_cruce:
+        if has_conflict:
             raise ValidationError(
-                'La habitación ya está reservada '
-                'en ese rango de fechas.',
+                'La habitación ya está '
+                'reservada en ese rango de fechas.'
             )
 
     def __str__(self):

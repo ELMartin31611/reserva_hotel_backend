@@ -1,7 +1,7 @@
 from django.db.models import (
     Exists,
+    F,
     OuterRef,
-    Q,
 )
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -16,6 +16,19 @@ from hotel_app.serializers.habitacion import (
     AvailabilityQuerySerializer,
     HabitacionSerializer,
 )
+
+
+NON_BOOKABLE_ROOM_STATES = {
+    'mantenimiento',
+    'inactiva',
+    'inactivo',
+    'ocupada',
+    'ocupado',
+    'bloqueada',
+    'bloqueado',
+    'fuera de servicio',
+    'fuera_servicio',
+}
 
 
 class HabitacionViewSet(ModelViewSet):
@@ -62,7 +75,7 @@ class HabitacionViewSet(ModelViewSet):
         query.is_valid(raise_exception=True)
         params = query.validated_data
 
-        reservation_conflicts = (
+        occupied_reservations = (
             ReservaHabitacion.objects.filter(
                 habitacion_id=OuterRef('pk'),
                 reserva__estado__in=[
@@ -78,36 +91,28 @@ class HabitacionViewSet(ModelViewSet):
             )
         )
 
-        unavailable_state = (
-            Q(estado__iexact='mantenimiento')
-            | Q(estado__iexact='en mantenimiento')
-            | Q(estado__iexact='fuera de servicio')
-            | Q(estado__iexact='fuera_servicio')
-            | Q(estado__iexact='inactiva')
-            | Q(estado__iexact='inactivo')
-            | Q(estado__iexact='bloqueada')
-            | Q(estado__iexact='bloqueado')
-            | Q(estado__iexact='no disponible')
-        )
-
         queryset = (
             self.get_queryset()
             .filter(
                 hotel_id=params['hotel'],
             )
-            .exclude(unavailable_state)
             .annotate(
-                has_reservation_conflict=Exists(
-                    reservation_conflicts,
+                has_conflicting_reservation=Exists(
+                    occupied_reservations
                 ),
             )
             .filter(
-                has_reservation_conflict=False,
+                has_conflicting_reservation=False,
             )
         )
 
+        for state in NON_BOOKABLE_ROOM_STATES:
+            queryset = queryset.exclude(
+                estado__iexact=state,
+            )
+
         adults = params.get(
-            'cantidad_adultos',
+            'cantidad_adultos'
         )
         children = params.get(
             'cantidad_ninos',
@@ -115,33 +120,52 @@ class HabitacionViewSet(ModelViewSet):
         )
 
         if adults is not None:
-            queryset = queryset.filter(
-                tipo_habitacion__capacidad_adultos__gte=(
-                    adults
-                ),
-                tipo_habitacion__capacidad_ninos__gte=(
-                    children
-                ),
-                tipo_habitacion__capacidad_total__gte=(
-                    adults + children
-                ),
+            total_guests = adults + children
+
+            queryset = (
+                queryset
+                .annotate(
+                    calculated_maximum_capacity=(
+                        F(
+                            'tipo_habitacion'
+                            '__capacidad_total'
+                        )
+                        + F(
+                            'tipo_habitacion'
+                            '__capacidad_extra'
+                        )
+                    ),
+                )
+                .filter(
+                    calculated_maximum_capacity__gte=(
+                        total_guests
+                    ),
+                )
             )
+
+            if children > 0:
+                queryset = queryset.filter(
+                    tipo_habitacion__capacidad_ninos__gt=0,
+                )
 
         queryset = queryset.order_by('id')
 
         page = self.paginate_queryset(
-            queryset,
+            queryset
         )
+
         serializer = self.get_serializer(
-            page
-            if page is not None
-            else queryset,
+            (
+                page
+                if page is not None
+                else queryset
+            ),
             many=True,
         )
 
         if page is not None:
             return self.get_paginated_response(
-                serializer.data,
+                serializer.data
             )
 
         return Response(serializer.data)

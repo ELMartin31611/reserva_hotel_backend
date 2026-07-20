@@ -1,10 +1,12 @@
 from rest_framework import serializers
 
-from hotel_app.models import ReservaHabitacion
+from hotel_app.models import (
+    ReservaHabitacion,
+)
 
 
 class ReservaHabitacionSerializer(
-    serializers.ModelSerializer,
+    serializers.ModelSerializer
 ):
     habitacion_numero = serializers.CharField(
         source='habitacion.numero',
@@ -40,6 +42,10 @@ class ReservaHabitacionSerializer(
             'noches',
             'cantidad_adultos',
             'cantidad_ninos',
+            'cantidad_huespedes_incluidos',
+            'cantidad_huespedes_extra',
+            'subtotal_habitacion',
+            'subtotal_huespedes_extra',
             'subtotal_adultos',
             'subtotal_ninos',
             'subtotal',
