@@ -1,15 +1,28 @@
 from rest_framework import serializers
-from hotel_app.models.reserva_habitacion import ReservaHabitacion
+
+from hotel_app.models import ReservaHabitacion
 
 
-class ReservaHabitacionSerializer(serializers.ModelSerializer):
+class ReservaHabitacionSerializer(
+    serializers.ModelSerializer,
+):
     habitacion_numero = serializers.CharField(
         source='habitacion.numero',
-        read_only=True
+        read_only=True,
     )
     tipo_habitacion = serializers.CharField(
-        source='habitacion.tipo_habitacion.nombre',
-        read_only=True
+        source=(
+            'habitacion.tipo_habitacion.nombre'
+        ),
+        read_only=True,
+    )
+    hotel_id = serializers.IntegerField(
+        source='habitacion.hotel_id',
+        read_only=True,
+    )
+    hotel_nombre = serializers.CharField(
+        source='habitacion.hotel.nombre',
+        read_only=True,
     )
 
     class Meta:
@@ -20,40 +33,20 @@ class ReservaHabitacionSerializer(serializers.ModelSerializer):
             'habitacion',
             'habitacion_numero',
             'tipo_habitacion',
+            'hotel_id',
+            'hotel_nombre',
             'tarifa',
             'precio_noche',
             'noches',
+            'cantidad_adultos',
+            'cantidad_ninos',
+            'subtotal_adultos',
+            'subtotal_ninos',
             'subtotal',
+            'detalle_tarifas',
+            'moneda',
             'estado',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = [
-            'precio_noche',
-            'noches',
-            'subtotal',
-            'created_at',
-            'updated_at',
-        ]
-
-    def validate(self, data):
-        reserva = data.get('reserva')
-        habitacion = data.get('habitacion')
-
-        if reserva and habitacion:
-            existe_cruce = ReservaHabitacion.objects.filter(
-                habitacion=habitacion,
-                reserva__estado__in=['pendiente', 'confirmada'],
-                reserva__fecha_entrada__lt=reserva.fecha_salida,
-                reserva__fecha_salida__gt=reserva.fecha_entrada,
-            )
-
-            if self.instance:
-                existe_cruce = existe_cruce.exclude(id=self.instance.id)
-
-            if existe_cruce.exists():
-                raise serializers.ValidationError(
-                    'La habitación ya está reservada en ese rango de fechas.'
-                )
-
-        return data
+        read_only_fields = fields
