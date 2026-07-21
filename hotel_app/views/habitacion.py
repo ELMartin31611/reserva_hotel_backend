@@ -2,14 +2,18 @@ from django.db.models import (
     Exists,
     F,
     OuterRef,
+    Prefetch,
 )
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from hotel_app.models import (
     Habitacion,
+    ImagenHabitacion,
     ReservaHabitacion,
+    TipoHabitacionServicio,
 )
 from hotel_app.permissions import IsAdminOrReadOnly
 from hotel_app.serializers.habitacion import (
@@ -28,6 +32,8 @@ NON_BOOKABLE_ROOM_STATES = {
     'bloqueado',
     'fuera de servicio',
     'fuera_servicio',
+    'eliminada',
+    'eliminado',
 }
 
 
@@ -42,12 +48,14 @@ class HabitacionViewSet(ModelViewSet):
         'piso',
         'es_fumador',
     ]
+
     search_fields = [
         'numero',
         'estado',
         'descripcion',
         'observaciones',
     ]
+
     ordering_fields = [
         'id',
         'numero',
@@ -55,12 +63,87 @@ class HabitacionViewSet(ModelViewSet):
         'created_at',
         'updated_at',
     ]
+
     ordering = ['id']
 
     def get_queryset(self):
-        return Habitacion.objects.select_related(
-            'hotel',
-            'tipo_habitacion',
+        return (
+            Habitacion.objects
+            .exclude(
+                estado__iexact='eliminada',
+            )
+            .exclude(
+                estado__iexact='eliminado',
+            )
+            .select_related(
+                'hotel',
+                'tipo_habitacion',
+            )
+            .prefetch_related(
+                Prefetch(
+                    'imagenes',
+                    queryset=(
+                        ImagenHabitacion.objects
+                        .order_by(
+                            '-es_principal',
+                            'orden',
+                            'id',
+                        )
+                    ),
+                ),
+                Prefetch(
+                    (
+                        'tipo_habitacion'
+                        '__servicios_habitacion'
+                    ),
+                    queryset=(
+                        TipoHabitacionServicio
+                        .objects
+                        .select_related(
+                            'servicio',
+                        )
+                        .order_by('id')
+                    ),
+                ),
+            )
+            .order_by('id')
+        )
+
+    def destroy(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        room = self.get_object()
+
+        has_reservation_history = (
+            ReservaHabitacion.objects
+            .filter(
+                habitacion=room,
+            )
+            .exists()
+        )
+
+        if not has_reservation_history:
+            room.delete()
+
+            return Response(
+                status=status.HTTP_204_NO_CONTENT,
+            )
+
+        # Si tiene reservas, no se elimina físicamente.
+        # Se conserva para proteger facturas e historial.
+        room.estado = 'eliminada'
+        room.save(
+            update_fields=[
+                'estado',
+                'updated_at',
+            ],
+        )
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
         )
 
     @action(
@@ -72,11 +155,15 @@ class HabitacionViewSet(ModelViewSet):
         query = AvailabilityQuerySerializer(
             data=request.query_params,
         )
-        query.is_valid(raise_exception=True)
+        query.is_valid(
+            raise_exception=True,
+        )
+
         params = query.validated_data
 
         occupied_reservations = (
-            ReservaHabitacion.objects.filter(
+            ReservaHabitacion.objects
+            .filter(
                 habitacion_id=OuterRef('pk'),
                 reserva__estado__in=[
                     'pendiente',
@@ -98,7 +185,7 @@ class HabitacionViewSet(ModelViewSet):
             )
             .annotate(
                 has_conflicting_reservation=Exists(
-                    occupied_reservations
+                    occupied_reservations,
                 ),
             )
             .filter(
@@ -106,14 +193,15 @@ class HabitacionViewSet(ModelViewSet):
             )
         )
 
-        for state in NON_BOOKABLE_ROOM_STATES:
+        for room_state in NON_BOOKABLE_ROOM_STATES:
             queryset = queryset.exclude(
-                estado__iexact=state,
+                estado__iexact=room_state,
             )
 
         adults = params.get(
-            'cantidad_adultos'
+            'cantidad_adultos',
         )
+
         children = params.get(
             'cantidad_ninos',
             0,
@@ -145,13 +233,18 @@ class HabitacionViewSet(ModelViewSet):
 
             if children > 0:
                 queryset = queryset.filter(
-                    tipo_habitacion__capacidad_ninos__gt=0,
+                    **{
+                        (
+                            'tipo_habitacion'
+                            '__capacidad_ninos__gt'
+                        ): 0,
+                    },
                 )
 
         queryset = queryset.order_by('id')
 
         page = self.paginate_queryset(
-            queryset
+            queryset,
         )
 
         serializer = self.get_serializer(
@@ -165,7 +258,9 @@ class HabitacionViewSet(ModelViewSet):
 
         if page is not None:
             return self.get_paginated_response(
-                serializer.data
+                serializer.data,
             )
 
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+        )
