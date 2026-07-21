@@ -1,24 +1,34 @@
 from rest_framework.viewsets import ModelViewSet
 
-from hotel_app.models.tipo_habitacion_cama import TipoHabitacionCama
-from hotel_app.serializers.tipo_habitacion_cama import TipoHabitacionCamaSerializer
+from hotel_app.models.tipo_habitacion_cama import (
+    TipoHabitacionCama,
+)
+from hotel_app.permissions import IsAdminOrReadOnly
+from hotel_app.serializers.tipo_habitacion_cama import (
+    TipoHabitacionCamaSerializer,
+)
 
 
 class TipoHabitacionCamaViewSet(ModelViewSet):
     queryset = TipoHabitacionCama.objects.all()
     serializer_class = TipoHabitacionCamaSerializer
+    permission_classes = [
+        IsAdminOrReadOnly,
+    ]
 
     filterset_fields = [
-        "tipo_habitacion",
-        "cama",
-        "cantidad",
+        'tipo_habitacion',
+        'cama',
+        'cantidad',
     ]
 
     ordering_fields = [
-        "id",
-        "cantidad",
-        "created_at",
-        "updated_at",
+        'id',
+        'cantidad',
+        'created_at',
+        'updated_at',
     ]
 
-    ordering = ["id"]
+    ordering = [
+        'id',
+    ]
