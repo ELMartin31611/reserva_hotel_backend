@@ -5,6 +5,7 @@ from .habitacion import HabitacionViewSet
 from .cama import CamaViewSet
 from .tipo_habitacion_cama import TipoHabitacionCamaViewSet
 from .imagen_habitacion import ImagenHabitacionViewSet
+from .media_hotel import MediaHotelViewSet
 from .servicio import ServicioViewSet
 
 from .pago import PagoViewSet

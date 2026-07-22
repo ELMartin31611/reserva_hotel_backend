@@ -6,6 +6,7 @@ from .habitacion import HabitacionSerializer
 from .cama import CamaSerializer
 from .tipo_habitacion_cama import TipoHabitacionCamaSerializer
 from .imagen_habitacion import ImagenHabitacionSerializer
+from .media_hotel import MediaHotelSerializer
 from .servicio import ServicioSerializer
 
 

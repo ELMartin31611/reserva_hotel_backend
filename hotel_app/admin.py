@@ -16,6 +16,7 @@ from hotel_app.models import (
     Cama,
     TipoHabitacionCama,
     ImagenHabitacion,
+    MediaHotel,
     Servicio,
 )
 
@@ -46,6 +47,7 @@ admin.site.register([
     Cama,
     TipoHabitacionCama,
     ImagenHabitacion,
+    MediaHotel,
     Servicio,
     TipoHabitacionServicio,
     Temporada,

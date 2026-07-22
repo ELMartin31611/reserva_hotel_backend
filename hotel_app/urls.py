@@ -21,6 +21,7 @@ from hotel_app.views import (
     CamaViewSet,
     TipoHabitacionCamaViewSet,
     ImagenHabitacionViewSet,
+    MediaHotelViewSet,
     ServicioViewSet,
     TipoHabitacionServicioViewSet,
     TemporadaViewSet,
@@ -58,6 +59,7 @@ router.register(r'habitaciones', HabitacionViewSet, basename='habitaciones')
 router.register(r'camas', CamaViewSet, basename='camas')
 router.register(r'tipos-habitacion-camas', TipoHabitacionCamaViewSet, basename='tipos-habitacion-camas')
 router.register(r'imagenes-habitacion', ImagenHabitacionViewSet, basename='imagenes-habitacion')
+router.register(r'media-hotel', MediaHotelViewSet, basename='media-hotel')
 router.register(r'servicios', ServicioViewSet, basename='servicios')
 
 # 17 - 19 Servicios y tarifas

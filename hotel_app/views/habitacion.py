@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.db import IntegrityError
 from django.db.models import (
     Exists,
@@ -218,3 +220,85 @@ class HabitacionViewSet(ModelViewSet):
             return self.get_paginated_response(serializer.data)
 
         return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='calendario',
+    )
+    def calendario(self, request, pk=None):
+        room = self.get_object()
+        try:
+            desde = date.fromisoformat(request.query_params['desde'])
+            hasta = date.fromisoformat(request.query_params['hasta'])
+        except (KeyError, ValueError):
+            return Response(
+                {
+                    'detail': (
+                        'Indica fechas válidas en los parámetros '
+                        'desde y hasta (AAAA-MM-DD).'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if hasta <= desde or (hasta - desde).days > 93:
+            return Response(
+                {
+                    'detail': (
+                        'El calendario debe tener entre 1 y 93 días.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reservations = (
+            ReservaHabitacion.objects
+            .filter(
+                habitacion=room,
+                reserva__estado__in=['pendiente', 'confirmada'],
+                reserva__fecha_entrada__lt=hasta,
+                reserva__fecha_salida__gt=desde,
+            )
+            .select_related('reserva')
+        )
+        booked_dates = set()
+        for reservation_room in reservations:
+            current = max(desde, reservation_room.reserva.fecha_entrada)
+            end = min(hasta, reservation_room.reserva.fecha_salida)
+            while current < end:
+                booked_dates.add(current)
+                current += timedelta(days=1)
+
+        room_state = room.estado.strip().lower()
+        reservable = room_state not in NON_BOOKABLE_ROOM_STATES
+        days = []
+        current = desde
+        while current < hasta:
+            if current < date.today():
+                day_state = 'pasada'
+            elif not reservable:
+                day_state = 'no_reservable'
+            elif current in booked_dates:
+                day_state = 'reservada'
+            else:
+                day_state = 'disponible'
+            days.append({
+                'fecha': current.isoformat(),
+                'estado': day_state,
+                'reservada': day_state == 'reservada',
+            })
+            current += timedelta(days=1)
+
+        return Response({
+            'habitacion': {
+                'id': room.id,
+                'numero': room.numero,
+                'hotel_id': room.hotel_id,
+                'hotel_nombre': room.hotel.nombre,
+                'reservable': reservable,
+            },
+            'desde': desde.isoformat(),
+            'hasta': hasta.isoformat(),
+            'dias': days,
+        })

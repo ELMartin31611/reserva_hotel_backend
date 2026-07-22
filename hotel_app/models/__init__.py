@@ -6,6 +6,7 @@ from .habitacion import Habitacion
 from .cama import Cama
 from .tipo_habitacion_cama import TipoHabitacionCama
 from .imagen_habitacion import ImagenHabitacion
+from .media_hotel import MediaHotel
 from .servicio import Servicio
 
 

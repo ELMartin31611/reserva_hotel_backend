@@ -1,5 +1,6 @@
 from django.db import IntegrityError
 from django.db.models import ProtectedError
+from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.parsers import (
     FormParser,
@@ -11,10 +12,19 @@ from rest_framework.viewsets import ModelViewSet
 
 from hotel_app.models import (
     Hotel,
+    MediaHotel,
     ReservaHabitacion,
+    Servicio,
+    TarifaHabitacion,
+    Temporada,
+    TipoHabitacionServicio,
 )
 from hotel_app.permissions import IsAdminOrReadOnly
 from hotel_app.serializers.hotel import HotelSerializer
+from hotel_app.serializers.habitacion import HabitacionSerializer
+from hotel_app.serializers.media_hotel import MediaHotelSerializer
+from hotel_app.serializers.servicio import ServicioSerializer
+from hotel_app.serializers.temporada import TemporadaSerializer
 
 
 class HotelViewSet(ModelViewSet):
@@ -96,3 +106,79 @@ class HotelViewSet(ModelViewSet):
         return Response(
             status=status.HTTP_204_NO_CONTENT,
         )
+
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='detalle',
+    )
+    def detalle(self, request, pk=None):
+        hotel = self.get_object()
+        rooms = hotel.habitaciones.exclude(
+            estado__iexact='eliminada',
+        ).exclude(
+            estado__iexact='eliminado',
+        ).select_related(
+            'tipo_habitacion',
+        ).prefetch_related(
+            'imagenes',
+            'tipo_habitacion__servicios_habitacion__servicio',
+        )
+        room_type_ids = list(
+            rooms.values_list('tipo_habitacion_id', flat=True).distinct(),
+        )
+        relations = TipoHabitacionServicio.objects.filter(
+            tipo_habitacion_id__in=room_type_ids,
+        ).select_related('servicio')
+        service_ids = relations.values_list('servicio_id', flat=True)
+        season_ids = TarifaHabitacion.objects.filter(
+            tipo_habitacion_id__in=room_type_ids,
+            is_active=True,
+        ).values_list('temporada_id', flat=True)
+
+        base = HotelSerializer(
+            hotel,
+            context={'request': request},
+        ).data
+        base.update({
+            'galeria': {
+                'imagenes': MediaHotelSerializer(
+                    MediaHotel.objects.filter(
+                        hotel=hotel,
+                        tipo='imagen',
+                    ),
+                    many=True,
+                    context={'request': request},
+                ).data,
+                'videos': MediaHotelSerializer(
+                    MediaHotel.objects.filter(
+                        hotel=hotel,
+                        tipo='video',
+                    ),
+                    many=True,
+                    context={'request': request},
+                ).data,
+            },
+            'habitaciones': HabitacionSerializer(
+                rooms,
+                many=True,
+                context={'request': request},
+            ).data,
+            'servicios': ServicioSerializer(
+                Servicio.objects.filter(
+                    id__in=service_ids,
+                    is_active=True,
+                ).distinct(),
+                many=True,
+                context={'request': request},
+            ).data,
+            'temporadas': TemporadaSerializer(
+                Temporada.objects.filter(
+                    id__in=season_ids,
+                    is_active=True,
+                ).distinct(),
+                many=True,
+                context={'request': request},
+            ).data,
+        })
+        return Response(base)
