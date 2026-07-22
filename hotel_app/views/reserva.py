@@ -90,6 +90,7 @@ class ReservaViewSet(
                     '__reserva_habitacion'
                     '__habitacion'
                 ),
+                'servicios',
             )
         )
 

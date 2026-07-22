@@ -1,8 +1,10 @@
+from django.db import IntegrityError
 from django.db.models import (
     Exists,
     F,
     OuterRef,
     Prefetch,
+    ProtectedError,
 )
 from rest_framework import status
 from rest_framework.decorators import action
@@ -20,7 +22,6 @@ from hotel_app.serializers.habitacion import (
     AvailabilityQuerySerializer,
     HabitacionSerializer,
 )
-
 
 NON_BOOKABLE_ROOM_STATES = {
     'mantenimiento',
@@ -92,16 +93,11 @@ class HabitacionViewSet(ModelViewSet):
                     ),
                 ),
                 Prefetch(
-                    (
-                        'tipo_habitacion'
-                        '__servicios_habitacion'
-                    ),
+                    'tipo_habitacion__servicios_habitacion',
                     queryset=(
                         TipoHabitacionServicio
                         .objects
-                        .select_related(
-                            'servicio',
-                        )
+                        .select_related('servicio')
                         .order_by('id')
                     ),
                 ),
@@ -119,32 +115,22 @@ class HabitacionViewSet(ModelViewSet):
 
         has_reservation_history = (
             ReservaHabitacion.objects
-            .filter(
-                habitacion=room,
-            )
+            .filter(habitacion=room)
             .exists()
         )
 
         if not has_reservation_history:
-            room.delete()
+            try:
+                room.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except (ProtectedError, IntegrityError):
+                pass
 
-            return Response(
-                status=status.HTTP_204_NO_CONTENT,
-            )
-
-        # Si tiene reservas, no se elimina físicamente.
-        # Se conserva para proteger facturas e historial.
+        # Si tiene reservas o restricciones de FK, realiza borrado lógico.
         room.estado = 'eliminada'
-        room.save(
-            update_fields=[
-                'estado',
-                'updated_at',
-            ],
-        )
+        room.save(update_fields=['estado', 'updated_at'])
 
-        return Response(
-            status=status.HTTP_204_NO_CONTENT,
-        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,
@@ -155,10 +141,7 @@ class HabitacionViewSet(ModelViewSet):
         query = AvailabilityQuerySerializer(
             data=request.query_params,
         )
-        query.is_valid(
-            raise_exception=True,
-        )
-
+        query.is_valid(raise_exception=True)
         params = query.validated_data
 
         occupied_reservations = (
@@ -169,12 +152,8 @@ class HabitacionViewSet(ModelViewSet):
                     'pendiente',
                     'confirmada',
                 ],
-                reserva__fecha_entrada__lt=(
-                    params['fecha_salida']
-                ),
-                reserva__fecha_salida__gt=(
-                    params['fecha_entrada']
-                ),
+                reserva__fecha_entrada__lt=params['fecha_salida'],
+                reserva__fecha_salida__gt=params['fecha_entrada'],
             )
         )
 
@@ -197,70 +176,45 @@ class HabitacionViewSet(ModelViewSet):
             queryset = queryset.exclude(
                 estado__iexact=room_state,
             )
-
-        adults = params.get(
-            'cantidad_adultos',
-        )
-
-        children = params.get(
-            'cantidad_ninos',
-            0,
-        )
-
-        if adults is not None:
-            total_guests = adults + children
-
-            queryset = (
-                queryset
-                .annotate(
-                    calculated_maximum_capacity=(
-                        F(
-                            'tipo_habitacion'
-                            '__capacidad_total'
-                        )
-                        + F(
-                            'tipo_habitacion'
-                            '__capacidad_extra'
-                        )
-                    ),
-                )
-                .filter(
-                    calculated_maximum_capacity__gte=(
-                        total_guests
-                    ),
-                )
+            queryset = queryset.exclude(
+                hotel__estado__iexact=room_state,
+            )
+            queryset = queryset.exclude(
+                tipo_habitacion__estado__iexact=room_state,
             )
 
-            if children > 0:
-                queryset = queryset.filter(
-                    **{
-                        (
-                            'tipo_habitacion'
-                            '__capacidad_ninos__gt'
-                        ): 0,
-                    },
-                )
+        adults = params['cantidad_adultos']
+        children = params['cantidad_ninos']
+
+        total_guests = adults + children
+
+        queryset = (
+            queryset
+            .annotate(
+                calculated_maximum_capacity=(
+                    F('tipo_habitacion__capacidad_total')
+                    + F('tipo_habitacion__capacidad_extra')
+                ),
+            )
+            .filter(
+                calculated_maximum_capacity__gte=total_guests,
+            )
+        )
+
+        if children > 0:
+            queryset = queryset.filter(
+                tipo_habitacion__capacidad_ninos__gt=0,
+            )
 
         queryset = queryset.order_by('id')
 
-        page = self.paginate_queryset(
-            queryset,
-        )
-
+        page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(
-            (
-                page
-                if page is not None
-                else queryset
-            ),
+            page if page is not None else queryset,
             many=True,
         )
 
         if page is not None:
-            return self.get_paginated_response(
-                serializer.data,
-            )
+            return self.get_paginated_response(serializer.data)
 
-        return Response(
-            serializer.data,
-        )
+        return Response(serializer.data)

@@ -28,6 +28,7 @@ from hotel_app.views import (
     ReservaViewSet,
     ReservaHabitacionViewSet,
     HuespedReservaViewSet,
+    ReservaServicioViewSet,
     PagoViewSet,
     FacturaViewSet,
     NotificacionSistemaViewSet,
@@ -68,6 +69,7 @@ router.register(r'tarifas-habitacion', TarifaHabitacionViewSet, basename='tarifa
 router.register(r'reservas', ReservaViewSet, basename='reservas')
 router.register(r'reserva-habitaciones', ReservaHabitacionViewSet, basename='reserva-habitaciones')
 router.register(r'huespedes-reserva', HuespedReservaViewSet, basename='huespedes-reserva')
+router.register(r'reserva-servicios', ReservaServicioViewSet, basename='reserva-servicios')
 router.register(r'pagos', PagoViewSet, basename='pagos')
 router.register(r'facturas', FacturaViewSet, basename='facturas')
 

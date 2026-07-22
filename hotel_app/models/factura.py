@@ -82,6 +82,11 @@ class Factura(models.Model):
         default='emitida',
     )
 
+    detalle_lineas = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

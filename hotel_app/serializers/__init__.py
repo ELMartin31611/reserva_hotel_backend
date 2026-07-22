@@ -16,6 +16,7 @@ from .factura import FacturaSerializer
 from .reserva import ReservaSerializer
 from .reserva_habitacion import ReservaHabitacionSerializer
 from .huesped_reserva import HuespedReservaSerializer
+from .reserva_servicio import ReservaServicioSerializer
 from .tipo_habitacion_servicio import TipoHabitacionServicioSerializer
 from .temporada import TemporadaSerializer
 from .tarifa_habitacion import TarifaHabitacionSerializer

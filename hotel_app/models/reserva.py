@@ -39,6 +39,22 @@ class Reserva(models.Model):
         choices=ESTADO_CHOICES,
         default='pendiente',
     )
+    subtotal_habitaciones = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0),
+        ],
+    )
+    subtotal_servicios = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0),
+        ],
+    )
     subtotal = models.DecimalField(
         max_digits=10,
         decimal_places=2,

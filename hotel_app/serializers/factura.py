@@ -35,6 +35,7 @@ class FacturaSerializer(
             'moneda',
             'metodo_pago',
             'estado',
+            'detalle_lineas',
             'created_at',
             'updated_at',
         ]

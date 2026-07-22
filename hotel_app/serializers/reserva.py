@@ -9,7 +9,9 @@ from hotel_app.serializers.huesped_reserva import (
 from hotel_app.serializers.reserva_habitacion import (
     ReservaHabitacionSerializer,
 )
-
+from hotel_app.serializers.reserva_servicio import (
+    ReservaServicioSerializer,
+)
 
 MAX_STAY_NIGHTS = 30
 MAX_ADVANCE_DAYS = 365
@@ -73,6 +75,18 @@ class GuestInputSerializer(
     )
 
 
+class ServiceInputSerializer(
+    serializers.Serializer,
+):
+    servicio_id = serializers.IntegerField(
+        min_value=1,
+    )
+    cantidad = serializers.IntegerField(
+        min_value=1,
+        default=1,
+    )
+
+
 class CompleteReservationInputSerializer(
     serializers.Serializer,
 ):
@@ -87,6 +101,12 @@ class CompleteReservationInputSerializer(
         many=True,
         allow_empty=False,
         max_length=50,
+    )
+    servicios = ServiceInputSerializer(
+        many=True,
+        required=False,
+        allow_empty=True,
+        default=list,
     )
     observaciones = serializers.CharField(
         required=False,
@@ -105,61 +125,41 @@ class CompleteReservationInputSerializer(
         if check_in < today:
             raise serializers.ValidationError({
                 'fecha_entrada': (
-                    'La fecha de entrada no puede '
-                    'ser pasada.'
+                    'La fecha de entrada no puede ser pasada.'
                 ),
             })
 
-        maximum_check_in = (
-            today
-            + timedelta(
-                days=MAX_ADVANCE_DAYS,
-            )
-        )
-
+        maximum_check_in = today + timedelta(days=MAX_ADVANCE_DAYS)
         if check_in > maximum_check_in:
             raise serializers.ValidationError({
                 'fecha_entrada': (
-                    'La reserva puede realizarse '
-                    'con máximo un año de anticipación.'
+                    'La reserva puede realizarse con máximo un año de anticipación.'
                 ),
             })
 
         if check_out <= check_in:
             raise serializers.ValidationError({
                 'fecha_salida': (
-                    'La fecha de salida debe ser '
-                    'mayor que la de entrada.'
+                    'La fecha de salida debe ser mayor que la de entrada.'
                 ),
             })
 
-        nights = (
-            check_out
-            - check_in
-        ).days
-
+        nights = (check_out - check_in).days
         if nights > MAX_STAY_NIGHTS:
             raise serializers.ValidationError({
                 'fecha_salida': (
-                    'La estancia máxima permitida '
-                    'es de 30 noches.'
+                    'La estancia máxima permitida es de 30 noches.'
                 ),
             })
 
-        attrs['observaciones'] = (
-            attrs.get('observaciones')
-            or ''
-        )
-
+        attrs['observaciones'] = attrs.get('observaciones') or ''
         return attrs
 
 
 class ReservaSerializer(
     serializers.ModelSerializer,
 ):
-    cliente_nombre = (
-        serializers.SerializerMethodField()
-    )
+    cliente_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserva
@@ -174,6 +174,8 @@ class ReservaSerializer(
             'cantidad_adultos',
             'cantidad_ninos',
             'estado',
+            'subtotal_habitaciones',
+            'subtotal_servicios',
             'subtotal',
             'impuestos',
             'descuento',
@@ -185,26 +187,22 @@ class ReservaSerializer(
         ]
         read_only_fields = fields
 
-    def get_cliente_nombre(
-        self,
-        obj,
-    ) -> str:
-        return (
-            f'{obj.cliente.nombres} '
-            f'{obj.cliente.apellidos}'
-        ).strip()
+    def get_cliente_nombre(self, obj) -> str:
+        return f'{obj.cliente.nombres} {obj.cliente.apellidos}'.strip()
 
 
 class ReservaDetailSerializer(
     ReservaSerializer,
 ):
-    habitaciones_reservadas = (
-        ReservaHabitacionSerializer(
-            many=True,
-            read_only=True,
-        )
+    habitaciones_reservadas = ReservaHabitacionSerializer(
+        many=True,
+        read_only=True,
     )
     huespedes = HuespedReservaSerializer(
+        many=True,
+        read_only=True,
+    )
+    servicios = ReservaServicioSerializer(
         many=True,
         read_only=True,
     )
@@ -214,5 +212,6 @@ class ReservaDetailSerializer(
             *ReservaSerializer.Meta.fields,
             'habitaciones_reservadas',
             'huespedes',
+            'servicios',
         ]
         read_only_fields = fields

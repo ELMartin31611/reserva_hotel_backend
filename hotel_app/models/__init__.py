@@ -16,6 +16,7 @@ from .factura import Factura
 from .reserva import Reserva
 from .reserva_habitacion import ReservaHabitacion
 from .huesped_reserva import HuespedReserva
+from .reserva_servicio import ReservaServicio
 from .tipo_habitacion_servicio import TipoHabitacionServicio
 from .temporada import Temporada
 from .tarifa_habitacion import TarifaHabitacion

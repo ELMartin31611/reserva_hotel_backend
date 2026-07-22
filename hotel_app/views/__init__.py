@@ -12,6 +12,7 @@ from .factura import FacturaViewSet
 from .reserva import ReservaViewSet
 from .reserva_habitacion import ReservaHabitacionViewSet
 from .huesped_reserva import HuespedReservaViewSet
+from .reserva_servicio import ReservaServicioViewSet
 from .tipo_habitacion_servicio import TipoHabitacionServicioViewSet
 from .temporada import TemporadaViewSet
 from .tarifa_habitacion import TarifaHabitacionViewSet

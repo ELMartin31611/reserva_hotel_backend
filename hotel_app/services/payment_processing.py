@@ -30,6 +30,13 @@ class PaymentProcessingService:
                 'cliente__perfil',
                 'cliente__perfil__user',
             )
+            .prefetch_related(
+                'habitaciones_reservadas',
+                'habitaciones_reservadas__habitacion',
+                'habitaciones_reservadas__habitacion__tipo_habitacion',
+                'servicios',
+                'servicios__servicio',
+            )
             .filter(pk=reservation_id)
             .first()
         )
@@ -88,8 +95,7 @@ class PaymentProcessingService:
         reference = reference.strip()
 
         if (
-            payment_method
-            == 'transferencia'
+            payment_method == 'transferencia'
             and not reference
         ):
             raise serializers.ValidationError({
@@ -136,10 +142,8 @@ class PaymentProcessingService:
             fecha_pago=timezone.now(),
             referencia=reference or None,
             observaciones=(
-                'Pago académico registrado '
-                'mediante StayBooking. '
-                'No se almacenaron datos '
-                'bancarios sensibles.'
+                'Pago registrado exitosamente '
+                'mediante StayBooking.'
             ),
         )
 
@@ -151,100 +155,88 @@ class PaymentProcessingService:
             ],
         )
 
+        # Generar detalle de líneas para factura inmutable
+        lineas_habitaciones = [
+            {
+                'habitacion_id': rh.habitacion_id,
+                'habitacion_numero': rh.habitacion.numero,
+                'tipo_habitacion': rh.habitacion.tipo_habitacion.nombre,
+                'noches': rh.noches,
+                'tarifa_por_noche': str(rh.precio_noche),
+                'huespedes_incluidos': rh.cantidad_huespedes_incluidos,
+                'huespedes_extra': rh.cantidad_huespedes_extra,
+                'recargo_por_huesped_extra': [
+                    {
+                        'fecha': detalle['fecha'],
+                        'precio_unitario': detalle['cargo_unitario_extra'],
+                        'subtotal': detalle['subtotal_huespedes_extra'],
+                    }
+                    for detalle in rh.detalle_tarifas
+                ],
+                'subtotal_huespedes_extra': str(rh.subtotal_huespedes_extra),
+                'subtotal_habitacion': str(rh.subtotal_habitacion),
+                'subtotal': str(rh.subtotal),
+                'detalle_tarifas_diarias': rh.detalle_tarifas,
+            }
+            for rh in reservation.habitaciones_reservadas.all()
+        ]
+
+        lineas_servicios = [
+            {
+                'servicio_id': rs.servicio_id,
+                'nombre': rs.nombre,
+                'cantidad': rs.cantidad,
+                'precio_unitario': str(rs.precio_unitario),
+                'subtotal': str(rs.subtotal),
+                'moneda': rs.moneda,
+            }
+            for rs in reservation.servicios.all()
+        ]
+
+        detalle_lineas = {
+            'habitaciones': lineas_habitaciones,
+            'servicios_adicionales': lineas_servicios,
+            'subtotal_habitaciones': str(reservation.subtotal_habitaciones),
+            'subtotal_servicios': str(reservation.subtotal_servicios),
+            'subtotal': str(reservation.subtotal),
+            'impuestos': str(reservation.impuestos),
+            'descuento': str(reservation.descuento),
+            'total': str(reservation.total),
+            'moneda': reservation.moneda,
+        }
+
         invoice, created = (
             Factura.objects.get_or_create(
                 reserva=reservation,
                 defaults={
-                    'cliente': (
-                        reservation.cliente
-                    ),
-                    'numero_factura': (
-                        Factura
-                        .generar_numero_factura()
-                    ),
-                    'fecha_emision': (
-                        timezone.now()
-                    ),
+                    'cliente': reservation.cliente,
+                    'numero_factura': Factura.generar_numero_factura(),
+                    'fecha_emision': timezone.now(),
                     'descripcion': (
-                        f'Reserva '
-                        f'{reservation.codigo} '
-                        f'por '
-                        f'{reservation.numero_noches} '
-                        'noche(s).'
+                        f'Reserva {reservation.codigo} por '
+                        f'{reservation.numero_noches} noche(s).'
                     ),
-                    'fecha_entrada': (
-                        reservation.fecha_entrada
-                    ),
-                    'fecha_salida': (
-                        reservation.fecha_salida
-                    ),
-                    'numero_noches': (
-                        reservation.numero_noches
-                    ),
-                    'subtotal': (
-                        reservation.subtotal
-                    ),
-                    'impuestos': (
-                        reservation.impuestos
-                    ),
-                    'descuento': (
-                        reservation.descuento
-                    ),
-                    'total': (
-                        reservation.total
-                    ),
-                    'moneda': (
-                        reservation.moneda
-                    ),
-                    'metodo_pago': (
-                        payment.metodo_pago
-                    ),
+                    'fecha_entrada': reservation.fecha_entrada,
+                    'fecha_salida': reservation.fecha_salida,
+                    'numero_noches': reservation.numero_noches,
+                    'subtotal': reservation.subtotal,
+                    'impuestos': reservation.impuestos,
+                    'descuento': reservation.descuento,
+                    'total': reservation.total,
+                    'moneda': reservation.moneda,
+                    'metodo_pago': payment.metodo_pago,
                     'estado': 'pagada',
+                    'detalle_lineas': detalle_lineas,
                 },
             )
         )
 
-        if not created:
-            invoice.cliente = (
-                reservation.cliente
-            )
-            invoice.fecha_emision = (
-                timezone.now()
-            )
-            invoice.descripcion = (
-                f'Reserva '
-                f'{reservation.codigo} por '
-                f'{reservation.numero_noches} '
-                'noche(s).'
-            )
-            invoice.fecha_entrada = (
-                reservation.fecha_entrada
-            )
-            invoice.fecha_salida = (
-                reservation.fecha_salida
-            )
-            invoice.numero_noches = (
-                reservation.numero_noches
-            )
-            invoice.subtotal = (
-                reservation.subtotal
-            )
-            invoice.impuestos = (
-                reservation.impuestos
-            )
-            invoice.descuento = (
-                reservation.descuento
-            )
-            invoice.total = (
-                reservation.total
-            )
-            invoice.moneda = (
-                reservation.moneda
-            )
-            invoice.metodo_pago = (
-                payment.metodo_pago
-            )
-            invoice.estado = 'pagada'
-            invoice.save()
+        if not created and not invoice.detalle_lineas:
+            raise serializers.ValidationError({
+                'factura': (
+                    'La reserva ya tiene una factura sin el detalle inmutable '
+                    'requerido. No se puede procesar el pago automáticamente.'
+                ),
+            })
 
         return payment, invoice

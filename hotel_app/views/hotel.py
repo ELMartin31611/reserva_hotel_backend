@@ -1,3 +1,5 @@
+from django.db import IntegrityError
+from django.db.models import ProtectedError
 from rest_framework import status
 from rest_framework.parsers import (
     FormParser,
@@ -68,14 +70,13 @@ class HotelViewSet(ModelViewSet):
         )
 
         if not has_reservation_history:
-            hotel.delete()
+            try:
+                hotel.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except (ProtectedError, IntegrityError):
+                pass
 
-            return Response(
-                status=status.HTTP_204_NO_CONTENT,
-            )
-
-        # Conserva reservas, pagos y facturas,
-        # pero retira el hotel del sistema.
+        # Conserva reservas, pagos y facturas, pero retira el hotel del sistema.
         hotel.estado = 'eliminado'
         hotel.save(
             update_fields=[
