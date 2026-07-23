@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -94,6 +95,21 @@ class Reserva(models.Model):
     observaciones = models.TextField(
         blank=True,
         null=True,
+    )
+    motivo_cancelacion = models.TextField(
+        blank=True,
+        default='',
+    )
+    fecha_cancelacion = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+    cancelada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='reservas_canceladas',
     )
 
     created_at = models.DateTimeField(

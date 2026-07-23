@@ -87,6 +87,22 @@ class ServiceInputSerializer(
     )
 
 
+class CancelReservationInputSerializer(
+    serializers.Serializer,
+):
+    motivo = serializers.CharField(
+        max_length=1000,
+        trim_whitespace=True,
+    )
+
+    def validate_motivo(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'Indica el motivo de la cancelación.'
+            )
+        return value
+
+
 class CompleteReservationInputSerializer(
     serializers.Serializer,
 ):
@@ -160,6 +176,7 @@ class ReservaSerializer(
     serializers.ModelSerializer,
 ):
     cliente_nombre = serializers.SerializerMethodField()
+    cancelada_por_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = Reserva
@@ -182,6 +199,10 @@ class ReservaSerializer(
             'total',
             'moneda',
             'observaciones',
+            'motivo_cancelacion',
+            'fecha_cancelacion',
+            'cancelada_por',
+            'cancelada_por_nombre',
             'created_at',
             'updated_at',
         ]
@@ -189,6 +210,15 @@ class ReservaSerializer(
 
     def get_cliente_nombre(self, obj) -> str:
         return f'{obj.cliente.nombres} {obj.cliente.apellidos}'.strip()
+
+    def get_cancelada_por_nombre(self, obj):
+        if obj.cancelada_por is None:
+            return None
+
+        return (
+            obj.cancelada_por.get_full_name().strip()
+            or obj.cancelada_por.get_username()
+        )
 
 
 class ReservaDetailSerializer(

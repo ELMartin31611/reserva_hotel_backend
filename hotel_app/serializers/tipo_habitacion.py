@@ -18,6 +18,7 @@ class TipoHabitacionSerializer(
             'id',
             'hotel',
             'nombre',
+            'categoria',
             'descripcion',
             'capacidad_adultos',
             'capacidad_ninos',
@@ -37,6 +38,14 @@ class TipoHabitacionSerializer(
         ]
 
     def validate(self, attrs):
+        hotel = attrs.get(
+            'hotel',
+            getattr(self.instance, 'hotel', None),
+        )
+        category = attrs.get(
+            'categoria',
+            getattr(self.instance, 'categoria', None),
+        )
         adults = attrs.get(
             'capacidad_adultos',
             getattr(
@@ -121,6 +130,18 @@ class TipoHabitacionSerializer(
             errors['precio_base'] = (
                 'No puede ser negativo.'
             )
+
+        if hotel and category:
+            duplicates = TipoHabitacion.objects.filter(
+                hotel=hotel,
+                categoria=category,
+            )
+            if self.instance:
+                duplicates = duplicates.exclude(pk=self.instance.pk)
+            if duplicates.exists():
+                errors['categoria'] = (
+                    'Este hotel ya tiene configurada esa categoría.'
+                )
 
         if errors:
             raise serializers.ValidationError(
