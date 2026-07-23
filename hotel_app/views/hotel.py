@@ -129,7 +129,7 @@ class HotelViewSet(ModelViewSet):
         )
         relations = TipoHabitacionServicio.objects.filter(
             tipo_habitacion_id__in=room_type_ids,
-        ).select_related('servicio')
+        ).select_related('servicio', 'tipo_habitacion')
         service_ids = relations.values_list('servicio_id', flat=True)
         season_ids = TarifaHabitacion.objects.filter(
             tipo_habitacion_id__in=room_type_ids,
@@ -140,6 +140,39 @@ class HotelViewSet(ModelViewSet):
             hotel,
             context={'request': request},
         ).data
+        services_payload = ServicioSerializer(
+            Servicio.objects.filter(
+                id__in=service_ids,
+                is_active=True,
+            ).distinct(),
+            many=True,
+            context={'request': request},
+        ).data
+
+        relations_by_service = {}
+        for relation in relations:
+            relations_by_service.setdefault(
+                relation.servicio_id,
+                [],
+            ).append({
+                'tipo_habitacion_id': relation.tipo_habitacion_id,
+                'tipo_habitacion_nombre': relation.tipo_habitacion.nombre,
+                'incluido': relation.incluido,
+                'precio_personalizado': (
+                    str(relation.precio_personalizado)
+                    if relation.precio_personalizado is not None
+                    else None
+                ),
+            })
+
+        for service in services_payload:
+            compatibility = relations_by_service.get(service['id'], [])
+            service['tipos_habitacion_compatibles'] = compatibility
+            service['incluido_en_alguna_habitacion'] = any(
+                item['incluido']
+                for item in compatibility
+            )
+
         base.update({
             'galeria': {
                 'imagenes': MediaHotelSerializer(
@@ -164,14 +197,7 @@ class HotelViewSet(ModelViewSet):
                 many=True,
                 context={'request': request},
             ).data,
-            'servicios': ServicioSerializer(
-                Servicio.objects.filter(
-                    id__in=service_ids,
-                    is_active=True,
-                ).distinct(),
-                many=True,
-                context={'request': request},
-            ).data,
+            'servicios': services_payload,
             'temporadas': TemporadaSerializer(
                 Temporada.objects.filter(
                     id__in=season_ids,

@@ -1,6 +1,7 @@
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -14,6 +15,11 @@ class ServicioViewSet(ModelViewSet):
     serializer_class = ServicioSerializer
     permission_classes = [
         IsAdminOrReadOnly,
+    ]
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+        JSONParser,
     ]
 
     filterset_fields = [
