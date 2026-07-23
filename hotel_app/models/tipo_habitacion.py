@@ -4,12 +4,30 @@ from hotel_app.models.hotel import Hotel
 
 
 class TipoHabitacion(models.Model):
+    class Categoria(models.TextChoices):
+        INDIVIDUAL = 'individual', 'Individual'
+        DOBLE = 'doble', 'Doble'
+        SUITE = 'suite', 'Suite'
+        VIP = 'vip', 'VIP'
+        PREMIUM = 'premium', 'Premium'
+        PRESIDENCIAL = 'presidencial', 'Presidencial'
+
     hotel = models.ForeignKey(
         Hotel,
         on_delete=models.CASCADE,
         related_name='tipos_habitacion',
     )
     nombre = models.CharField(max_length=80)
+    categoria = models.CharField(
+        max_length=20,
+        choices=Categoria.choices,
+        blank=True,
+        null=True,
+        help_text=(
+            'Categoría normalizada. Los registros históricos sin '
+            'categoría se conservan hasta ser normalizados.'
+        ),
+    )
     descripcion = models.TextField()
     capacidad_adultos = models.IntegerField()
     capacidad_ninos = models.IntegerField()
@@ -43,6 +61,13 @@ class TipoHabitacion(models.Model):
         db_table = 'tipo_habitacion'
         verbose_name = 'Tipo de Habitación'
         verbose_name_plural = 'Tipos de Habitación'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['hotel', 'categoria'],
+                condition=models.Q(categoria__isnull=False),
+                name='unique_room_category_per_hotel',
+            ),
+        ]
 
     @property
     def capacidad_maxima(self):

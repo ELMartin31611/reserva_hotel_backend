@@ -180,9 +180,17 @@ class AvailabilityQuerySerializer(serializers.Serializer):
     fecha_salida = serializers.DateField(required=False)
     entrada = serializers.DateField(required=False)
     salida = serializers.DateField(required=False)
-    cantidad_adultos = serializers.IntegerField(min_value=1, required=False)
+    cantidad_adultos = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        default=1,
+    )
     adultos = serializers.IntegerField(min_value=1, required=False)
-    cantidad_ninos = serializers.IntegerField(min_value=0, required=False)
+    cantidad_ninos = serializers.IntegerField(
+        min_value=0,
+        required=False,
+        default=0,
+    )
     ninos = serializers.IntegerField(min_value=0, required=False)
 
     def to_internal_value(self, data):
@@ -214,15 +222,6 @@ class AvailabilityQuerySerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'fecha_salida': 'La fecha de salida es obligatoria.'
             })
-        if adults is None:
-            raise serializers.ValidationError({
-                'cantidad_adultos': 'La cantidad de adultos es obligatoria.'
-            })
-        if children is None:
-            raise serializers.ValidationError({
-                'cantidad_ninos': 'La cantidad de niños es obligatoria.'
-            })
-
         today = date.today()
         if check_in < today:
             raise serializers.ValidationError({
